@@ -1017,10 +1017,9 @@ int socket_loop(int argc, char **argv)
 		return 1;
 }
 
-int main(int argc, char **argv)
+int monitor_main(int argc, char **argv)
 {
 	int ret;
-
 	ret = env_init(argv[1]);
 	if (ret)
 		return ret;
@@ -1038,5 +1037,57 @@ int main(int argc, char **argv)
 		perror("Unknown monitor");
 	}
 
+	return 1;
+}
+
+int main(int argc, char **argv)
+{
+	int ret;
+	int comm_server_ret;
+	int comm_client_ret;
+	char* comm_mode;
+
+	comm_mode = getenv("PROXY_COMM");
+	if (comm_mode >= 0)
+	{
+		//printf("\nStarting in Server Mode \n");
+		//comm_server_ret = commserver();
+		if (strncmp(comm_mode, "server", 6) == 0) {
+			printf("\nStarting in Server Mode \n");
+			comm_server_ret = commserver();
+		} else if (strncmp(comm_mode, "client", 6) == 0) {
+			printf("\nStarting in Client Mode \n");
+			comm_client_ret = commclient();
+		} else {
+			printf("\nStarting without Client or Server, %s inner \n", comm_mode);
+		}
+	}
+	else
+	{
+		printf("\nStarting without Client or Server, %s \n", comm_mode);
+		//printf("\nStarting in Client Mode \n");
+		//comm_client_ret = commclient();
+	}
+
+	return monitor_main(argc, argv);
+
+	/*
+	ret = env_init(argv[1]);
+	if (ret)
+		return ret;
+
+
+	switch(monitor) {
+	case UHYVE:
+		return uhyve_loop();
+
+	case BAREMETAL:
+	case QEMU:
+		return socket_loop(argc, argv);
+
+	default:
+		perror("Unknown monitor");
+	}
+	*/
 	return 1;
 }
