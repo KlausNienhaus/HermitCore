@@ -25,6 +25,26 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+
+/*
+* This file is the starting point of the environment (uhyve/qemu/) for the hermitcore(unikernel) and it's linked application.
+*
+* It uses environmental variables to define such things as the state in which the hermitcore boots, IP addresses it uses.
+* The environmental variables are called by getenv() in the code and this function will return zero, if the env variable hasn't been set. 
+* List of used envirmental variables in this file:
+* HERMIT_ISLE - state of the startup process
+* HERMIT_PORT - port of communication with hermitcore
+* HERMIT_CPUS - number of CPU used for the hermitcore
+* HERMIT_MEM - memory size allocated for the unikernel
+* HERMIT_QEMU - Name of QEMU executive
+* HERMIT_APP_PORT - 
+* HERMIT_KVM - 
+* HERMIT_MONITOR - 
+* HERMIT_DEBUG - 
+* HERMIT_CAPTURE_NET - 
+* HERMIT_VERBOSE - 
+*/
+
 #define _GNU_SOURCE
 
 #include <arpa/inet.h>
@@ -86,6 +106,8 @@ static void dump_log(void);
 static int multi_init(char *path);
 static int qemu_init(char *path);
 
+//@brief: 	qemu_fini function is called on hermitcore shut down in qemu operation, which got booted up by qemu_init.
+//			it cleans up after hermitcore and it's linked application are finished.
 static void qemu_fini(void)
 {
 	FILE* fp = NULL;
@@ -116,17 +138,20 @@ static void qemu_fini(void)
 	unlink(tmpname);
 }
 
+//@brief: mutli_fini is the stop process for a multi_init run hermitcore in baremetal operation.
 static void multi_fini(void)
 {
 	dump_log();
 	stop_hermit();
 }
 
+//@brief: this function gets called when signalhandler sigaction sINT or sTerm get triggered to shutdown the process.
 static void exit_handler(int sig)
 {
 	exit(0);
 }
 
+//@brief: is used in qemu_init to expand the argv list by frequency and proxy elements
 static char* get_append_string(void)
 {
 	uint32_t freq = get_cpufreq();
@@ -138,12 +163,14 @@ static char* get_append_string(void)
 	return cmdline;
 }
 
+//@brief: 	env_init function establishes environmental variables to deside in which state the hermitcore is started 
+//			and sets signal handler sigaction SIGINT and SIGTERM
 static int env_init(char *path)
 {
 	char* str;
 	struct sigaction sINT, sTERM;
 
-	// define action for SIGINT
+	// define action handler for SIGINT
 	sINT.sa_handler = exit_handler;
 	sINT.sa_flags = 0;
 	if (sigaction(SIGINT, &sINT, NULL) < 0)
@@ -152,7 +179,7 @@ static int env_init(char *path)
 		exit(1);
 	}
 
-	// define action for SIGTERM
+	// define action handler for SIGTERM
 	sTERM.sa_handler = exit_handler;
 	sTERM.sa_flags = 0;
 	if (sigaction(SIGTERM, &sTERM, NULL) < 0)
@@ -161,6 +188,7 @@ static int env_init(char *path)
 		exit(1);
 	}
 
+	//sets state monitor for the to the different start up possibilities of the hermitcore
 	str = getenv("HERMIT_ISLE");
 	if (str)
 	{
@@ -177,6 +205,7 @@ static int env_init(char *path)
 		}
 	}
 
+	//changes port of hermitcore to environmental variable defined port if set
 	str = getenv("HERMIT_PORT");
 	if (str)
 	{
@@ -185,6 +214,7 @@ static int env_init(char *path)
 			port = HERMIT_PORT;
 	}
 
+	//uses monitor variable to decide between different start up possibilities and registers exit functions for them
 	if (monitor == QEMU) {
 		atexit(qemu_fini);
 		return qemu_init(path);
@@ -196,6 +226,8 @@ static int env_init(char *path)
 	}
 }
 
+//@brief 	is used in wait_hermit_available in the qemu hermitcore intialisation process to see if it is booted
+// 			was also used in baremetal mode to dump results into a log file
 static int is_hermit_available(void)
 {
 	char* line = (char*) malloc(2048);
@@ -240,7 +272,7 @@ static int is_hermit_available(void)
 	   return ret;
 }
 
-// wait until HermitCore is sucessfully booted
+//@brief 	is waiting for HermitCore to be successfully booted and is using is_hermit_available to see if it is booted
 static void wait_hermit_available(void)
 {
 	char buffer[BUF_LEN];
@@ -265,6 +297,7 @@ static void wait_hermit_available(void)
 		exit(1);
 	}
 
+	//infinite loop until hermitcore is booted and as such reacts to is_hermit_available to then leave the infinite loop.
 	while(1) {
 		int length = read(fd, buffer, BUF_LEN);
 
@@ -285,6 +318,8 @@ static void wait_hermit_available(void)
 	close(fd);
 }
 
+//@brief: 	qemu_init function checks if environmental have been set and overrites standard values in qemu_argv with them if set.
+//			after the intialisation forks a new process as QEMU VM
 static int qemu_init(char *path)
 {
 	int kvm, i = 0;
@@ -298,6 +333,7 @@ static int qemu_init(char *path)
 	char* qemu_str = "qemu-system-x86_64";
 	char* qemu_argv[] = {qemu_str, "-daemonize", "-display", "none", "-smp", "1", "-m", "2G", "-pidfile", pidname, "-net", "nic,model=rtl8139", "-net", hostfwd, "-chardev", chardev_file, "-device", "pci-serial,chardev=gnc0", "-kernel", loader_path, "-initrd", path, "-append", get_append_string(), NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
 
+	//checks which env variables have been set and then initialises them in qemu_argv char array
 	str = getenv("HERMIT_CPUS");
 	if (str)
 		qemu_argv[5] = str;
@@ -415,6 +451,7 @@ static int qemu_init(char *path)
 		fflush(stdout);
 	}
 
+	//starts new process for the QEMU VM
 	qemu_pid = fork();
 	if (qemu_pid == 0)
 	{
@@ -441,6 +478,8 @@ static int qemu_init(char *path)
 	return 0;
 }
 
+//@brief: 	multi_init function prepares the baremetal execution of the hermitcore
+//			it sets path to executeable and the isle on which it gets executed	
 static int multi_init(char *path)
 {
 	int ret;
@@ -507,6 +546,7 @@ static int multi_init(char *path)
 	return 0;
 }
 
+//@brief: dump_log function gets called on exit or on other occasions to generate a kernel log of the system before it is shut down
 static void dump_log(void)
 {
 	char* str = getenv("HERMIT_VERBOSE");
@@ -539,6 +579,7 @@ static void dump_log(void)
 	fclose(file);
 }
 
+//@brief: stop_hermit function is used to stop and free rescources used by the Hermitcore in baremetal mode
 static void stop_hermit(void)
 {
 	FILE* file;
@@ -560,10 +601,8 @@ static void stop_hermit(void)
 	fclose(file);
 }
 
-/*
- * in principle, HermitCore forwards basic system calls to
- * this proxy, which mapped these call to Linux system calls.
- */
+//@brief: 	in principle, HermitCore forwards basic system calls to
+//			this proxy, which mappes these call to Linux system calls.
 int handle_syscalls(int s)
 {
 	int sysnr;
@@ -588,8 +627,8 @@ int handle_syscalls(int s)
 			j = 0;
 			while(j < sizeof(arg)) {
 				sret = read(s, ((char*)&arg)+j, sizeof(arg)-j);
-				if (sret < 0)
-					goto out;
+				if (sret < 0) 
+					goto out;				
 				j += sret;
 			}
 			close(s);
@@ -869,6 +908,9 @@ out:
 	return 1;
 }
 
+//@brief: 	start up function called for hermit operation in baremetal and qemu operation
+// 			it initialises socket for communication with the hermit kernel
+//			sends arguments and environmental parameter over this socket and handles system calls for hermit core
 int socket_loop(int argc, char **argv)
 {
 	int i, j, ret, s;
@@ -1017,6 +1059,8 @@ int socket_loop(int argc, char **argv)
 		return 1;
 }
 
+//@brief: 	starting point of application. Calls a function to set the environmental parameters variables
+// 			and decides in which state to start the hermitkernel depending on the readout state of environment
 int main(int argc, char **argv)
 {
 	int ret;

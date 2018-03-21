@@ -258,6 +258,7 @@ static inline void close_fd(int* fd)
 	}
 }
 
+//@brief: gets called by atexit on termitation of hermitcore and kills threads and closes filediscriptoren of kvm and vcpu
 static void uhyve_exit(void* arg)
 {
 	if (pthread_mutex_trylock(&kvm_lock))
@@ -281,7 +282,9 @@ static void uhyve_exit(void* arg)
 
 	close_fd(&vcpufd);
 }
-
+//@brief: 	is registered as atexit function on uhyve_init
+//			at exit it calls uhyve_exit to terminate threads 
+//			then clears vcpu allocated memory and closes kvm and vcpu file discriptors
 static void uhyve_atexit(void)
 {
 	uhyve_exit(NULL);
@@ -311,6 +314,7 @@ static void uhyve_atexit(void)
 	close_fd(&kvm);
 }
 
+//@brief: loads up hermitcore with checks of validity and connection setup set by environmental variables
 static int load_kernel(uint8_t* mem, char* path)
 {
 	Elf64_Ehdr hdr;
@@ -437,6 +441,7 @@ out:
 	return 0;
 }
 
+//@brief: 	function called in uhyve_init if a checkpoint has been detected to bring memory into checkpoint state
 static int load_checkpoint(uint8_t* mem, char* path)
 {
 	char fname[MAX_FNAME];
@@ -776,6 +781,8 @@ static inline void check_network(void)
 	}
 }
 
+//@brief: 	handles vcpu threads alive handels exeptions and requests
+//			
 static int vcpu_loop(void)
 {
 	int ret;
@@ -985,6 +992,7 @@ static int vcpu_loop(void)
 	return 0;
 }
 
+//@brief: prepares registers for VCPU for Hermitcore execution from Checkpoint or fresh start
 static int vcpu_init(void)
 {
 	struct kvm_mp_state mp_state = { KVM_MP_STATE_RUNNABLE };
@@ -1087,6 +1095,7 @@ static int vcpu_init(void)
 	return 0;
 }
 
+//@brief: 	function which saves CPU Registers into a checkpoint core file 
 static void save_cpu_state(void)
 {
 	struct {
@@ -1162,6 +1171,8 @@ static void save_cpu_state(void)
 	fclose(f);
 }
 
+//@brief: 	function called by signal handler registered in uhyve_thread
+//			holds threads with barrier wait to take CPU Register Checkpoint
 static void sigusr_handler(int signum)
 {
 	pthread_barrier_wait(&barrier);
@@ -1171,6 +1182,9 @@ static void sigusr_handler(int signum)
 	pthread_barrier_wait(&barrier);
 }
 
+//@brief: 	function which is utilized as creator in uhyve_loop 
+//			to initialise VCPU, run VCPU in their own thread for each CPU, 
+//			register cleanup functions and install signal handler for each of this threats
 static void* uhyve_thread(void* arg)
 {
 	size_t ret;
@@ -1196,11 +1210,15 @@ static void* uhyve_thread(void* arg)
 	return (void*) ret;
 }
 
+//@brief: termination function registered in uhyve_init handle termination signal sigterm
 void sigterm_handler(int signum)
 {
 	pthread_exit(0);
 }
 
+//@brief: 	function initialising the runtime environment for a hermitcore in uhyve mode 
+//			register cleanup functions and registers termination signal handler for the uhyve thread
+//			restores environment by environmetal variables or checkpoint
 int uhyve_init(char *path)
 {
 	char* v = getenv("HERMIT_VERBOSE");
@@ -1212,6 +1230,7 @@ int uhyve_init(char *path)
 	// register routine to close the VM
 	atexit(uhyve_atexit);
 
+	// checkpoint config file: transmites general setup of the state in which the old host system was run.
 	FILE* f = fopen("checkpoint/chk_config.txt", "r");
 	if (f != NULL) {
 		int tmp = 0;
@@ -1397,6 +1416,8 @@ int uhyve_init(char *path)
 	return ret;
 }
 
+//@brief:	function used to generate checkpoints as it gets called from signal handler 
+//			if a checkpointing interval has been set over Enironmental Variable "Hermit_Checkpoin"
 static void timer_handler(int signum)
 {
 	struct stat st = {0};
@@ -1568,6 +1589,9 @@ nextslot:
 	no_checkpoint++;
 }
 
+//@brief: 	Entry function to uhyve execution from proxy.c start
+//			starts threads for the different VCPU and leads to their execution in vcpu_loop
+//			sets up signal handler for checkpointing if Envirmental Variable "Hermit_Checkpoint" has been set
 int uhyve_loop(int argc, char **argv)
 {
 	const char* hermit_check = getenv("HERMIT_CHECKPOINT");
