@@ -44,22 +44,23 @@ int main(int argc, char** argv)
     int ZaehlerSleeps = 0;
 
 
-/** @brief Run Infintie Loop to test Checkpointing by looking at:
- * local time differences, process time difference and loop iteration count */
-    for (;;)
+/*   @brief Run Infintie Loop to test Checkpointing by looking at:
+ *  local time differences, process time difference and loop iteration count */
+    while (1)
     {
         time(&now);
-	    printf("before sleep: %d\n", ctime(&now));
+	    printf("before sleep: %d\n", gettimeofday(&begin, NULL));
         
-        msleep(360);
+        sys_msleep(10000);
+        
         ZaehlerSleeps++;
         
         now = time(0);
-	    printf("after sleep: %s\n", ctime(&now));
+	    printf("after sleep: %s\n", gettimeofday(&begin, NULL));
 
         end = clock();
         CPUtime_spent_in_app = (double)(end - begin) / CLOCKS_PER_SEC;
-        printf("Clocktime in Loop %d : %s\n", ZaehlerSleeps, ctime(&now));
+        printf("Clocktime in Loop %d : %s\n", ZaehlerSleeps, gettimeofday(&begin, NULL));
     }
     
 
