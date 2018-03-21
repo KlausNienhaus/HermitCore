@@ -50,12 +50,13 @@ int commserver(int argc, char const *argv[])
     int server_fd, new_socket, valread; //data_size;
     struct sockaddr_in address;
     int opt = 1;
+    int filesrecv = 0;
     int addrlen = sizeof(address);
     char buffer[1024]= {0};
     //char *data_name,*data_position;
     
     comm_socket_header_t meta_data = {0};
-    
+
 
     // creating socket file descriptor
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
@@ -64,7 +65,7 @@ int commserver(int argc, char const *argv[])
         exit(EXIT_FAILURE);
     }
       
-    // forcefully attaching socket to the port
+    // enable reuse of port and address
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
     {
         perror("setsockopt failed");
@@ -97,8 +98,7 @@ int commserver(int argc, char const *argv[])
 
     while(1)
     {
-        if ((new_socket = accept(server_fd, (struct sockaddr *)&address, 
-                       (socklen_t*)&addrlen))<0)
+        if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0)
         {
             perror("accept failed");
             exit(EXIT_FAILURE);
@@ -111,7 +111,7 @@ int commserver(int argc, char const *argv[])
         printf("metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
 
         // hardcoded for testing purposes atm
-        strcpy(meta_data.data_name, "testcopy_Abrechnung.xlsm");
+        strcpy(meta_data.data_name, "checkpoint/chk_config_copy.txt"); //"checkpoint/testcopy_Abrechnung.xlsm"
 
         // create file where data will be stored
         FILE *fp;
@@ -127,18 +127,18 @@ int commserver(int argc, char const *argv[])
         {
             // first read file in chunks of buffer bytes
             int recv_writen = 0;
-            int valrecv = recv( new_socket , buffer, sizeof(buffer), 0);
+            int valrecv = recv(new_socket , buffer, sizeof(buffer), 0);
             //printf("Bytes recieved %d \n", valrecv);        
             // if recv was success, write data to file.
             if(valrecv > 0)
             {
                 //printf("Writing buffer to file \n");
-                recv_writen += fwrite(buffer,sizeof(char), valrecv, fp);
+                recv_writen += fwrite(buffer, sizeof(char), valrecv, fp);
               
             }
 
             
-            // checking if everything was revied or something is missing and an error occured 
+            // checking if everything was recieved or something is missing and an error occured 
             if (valrecv < sizeof(buffer))
             {
                 fseek(fp, 0, SEEK_END); // seek to end of file
@@ -160,6 +160,7 @@ int commserver(int argc, char const *argv[])
                 }
                 fflush(fp);
                 fclose(fp);
+                filesrecv++;
                 break;
             }
         }
@@ -167,6 +168,7 @@ int commserver(int argc, char const *argv[])
         printf("finished file transfer closing socket and waiting for new connection\n");
         close(new_socket);
         sleep(1);
+        if (filesrecv>=3) break;
     }
 
 
@@ -194,7 +196,7 @@ int commclient(int argc, char const *argv[])
         return -1;
     }
   
-    memset(&serv_addr, '0', sizeof(serv_addr)); // muss ich wieder frei geben am Ende der Funktion oder räumt system automatisch weg?
+    memset(&serv_addr, '0', sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(PORT);
       
@@ -212,8 +214,8 @@ int commclient(int argc, char const *argv[])
     }
 
     //setting the file to be transfered into place
-    strcpy(meta_data.data_name,"Abrechnung.xlsm");
-    strcpy(meta_data.data_position,"");
+    strcpy(meta_data.data_name,"checkpoint/chk_config.txt"); //"checkpoint/Abrechnung.xlsm"
+    strcpy(meta_data.data_position,"checkpoint/");
 
     // open the file that we wish to transfer
     FILE *fp = fopen(meta_data.data_name,"rb");
@@ -291,3 +293,6 @@ int commclient(int argc, char const *argv[])
     close(sock);
     return 0;
 }
+
+
+
