@@ -40,6 +40,6 @@ typedef struct{
 } comm_socket_header_t;
 
 int commserver(void);
-int commclient(char *path);
+int commclient(char *path, char *position);
 
 #endif

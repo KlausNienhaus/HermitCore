@@ -61,8 +61,6 @@ int commserver(void)
     
     comm_socket_header_t meta_data = {0};
 
-    if (stat("checkpoint", &st) == -1)
-		mkdir("checkpoint", 0700);
 
     // creating socket file descriptor
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
@@ -119,7 +117,8 @@ int commserver(void)
 
         // hardcoded for testing purposes atm
         //strcpy(meta_data.data_name, "checkpoint/chk_config_copy.txt"); //"checkpoint/testcopy_Abrechnung.xlsm"
-        
+        if (stat(meta_data.data_position, &st) == -1)
+		mkdir(meta_data.data_position, 0700);
 
         // create file where data will be stored
         FILE *fp;
@@ -142,7 +141,6 @@ int commserver(void)
             {
                 //printf("Writing buffer to file \n");
                 recv_writen += fwrite(buffer, sizeof(char), valrecv, fp);
-              
             }
 
             
@@ -180,7 +178,11 @@ int commserver(void)
         printf("finished file transfer closing socket and waiting for new connection\n");
         close(new_socket);
         sleep(1);
-        if (filesrecv>=3) break;
+        if (filesrecv>=3) 
+        {
+            printf("recieved all checkpoint files starting up system\n");
+            break;
+        }
     }
 
     //close(server_fd);
@@ -189,7 +191,7 @@ int commserver(void)
 
 //@brief:   Client side C function for TCP Socket Connections 
 //          atm sends data file to server (e.g. checkpoint)
-int commclient(char *path)
+int commclient(char *path, char *position)
 {
     struct sockaddr_in address;
     int sock = 0, valread, length; //data_size;
@@ -229,15 +231,11 @@ int commclient(char *path)
         return -1;
     }
 
-    if (stat("checkpoint", &st) == -1)
-		mkdir("checkpoint", 0700);
 
-    //setting the file to be transfered into place
-    //if (argv[0]>0)
-    //    strcpy(meta_data.data_name,argv[0]);
-    //else
-        strcpy(meta_data.data_name, path); //"checkpoint/Abrechnung.xlsm" "checkpoint/chk_config.txt"
-    strcpy(meta_data.data_position,"checkpoint");
+    strcpy(meta_data.data_name, path); //"checkpoint/Abrechnung.xlsm" "checkpoint/chk_config.txt"
+    strcpy(meta_data.data_position, position);
+    if (stat(meta_data.data_position, &st) == -1)
+		mkdir(meta_data.data_position, 0700);
 
     // open the file that we wish to transfer
     FILE *fp = fopen(meta_data.data_name,"rb");
@@ -246,9 +244,8 @@ int commclient(char *path)
         printf("File open error \n");
         return 1;   
     } 
-    //int len = strlen((char*)&fp)+1;  
+     
     fseek(fp, 0, SEEK_END); // seek to end of file and set current file to it
-    //int filesize = ftell(fp);
     meta_data.data_size = ftell(fp);   // assign current filepointer (end of file), which is size of the file, to data_size
     rewind(fp); // set file pointer back to start of file
    

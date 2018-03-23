@@ -1064,12 +1064,12 @@ int main(int argc, char **argv)
 			//	perror("commclient call failed");
 		} else if (strncmp(comm_mode, "client", 6) == 0) {
 			printf("\nStarting in Client Mode \n");
-			comm_client_ret = commclient("checkpoint/chk_config.txt");
+			//comm_client_ret = commclient("checkpoint/chk_config.txt");
 			//if (comm_client_ret<0) 
 			//	perror("commclient call failed");
-			comm_client_ret = commclient("checkpoint/chk0_core0.dat");
+			//comm_client_ret = commclient("checkpoint/chk0_core0.dat");
 			//if (comm_client_ret<0) perror("commclient call failed");
-			comm_client_ret = commclient("checkpoint/chk0_mem.dat");
+			//comm_client_ret = commclient("checkpoint/chk0_mem.dat");
 			//if (comm_client_ret<0) perror("commclient call failed");
 			
 		} else {

@@ -1346,6 +1346,8 @@ static void timer_handler(int signum)
 	const size_t flag = (!full_checkpoint && (no_checkpoint > 0)) ? PG_DIRTY : PG_ACCESSED;
 	char fname[MAX_FNAME];
 	struct timeval begin, end;
+	const char* hermit_check = getenv("HERMIT_CHECKPOINT");
+	const char* comm_mode = getenv("PROXY_COMM");
 
 	if (verbose)
 		gettimeofday(&begin, NULL);
@@ -1509,6 +1511,16 @@ nextslot:
 	}
 
 	no_checkpoint++;
+
+	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
+	{
+		commclient("checkpoint/chk_config.txt","checkpoint");
+		commclient("checkpoint/chk0_core0.dat","checkpoint");
+		commclient("checkpoint/chk0_mem.dat","checkpoint");
+		printf("Client transfered checkpoint and stops execution now");
+		sigterm_handler(SIGTERM);
+	}
+	
 }
 
 int uhyve_loop(void)
