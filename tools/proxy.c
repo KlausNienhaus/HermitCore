@@ -47,6 +47,7 @@
 #include <unistd.h>
 
 #include "proxy.h"
+#include "comm.h"
 
 #define MAX_PATH	255
 #define MAX_ARGS	1024
@@ -1045,21 +1046,34 @@ int main(int argc, char **argv)
 	int ret;
 	int comm_server_ret;
 	int comm_client_ret;
-	char* comm_mode;
+	char* comm_mode; 
+	char name_arg[1024] = "checkpoint/chk_config.txt";
+
+	printf("name_arg: %s\n",name_arg);
 
 	comm_mode = getenv("PROXY_COMM");
-	if (comm_mode >= 0)
+	printf("PROXY_COMM is set to: %s\n",comm_mode);
+	if (comm_mode)
 	{
 		//printf("\nStarting in Server Mode \n");
 		//comm_server_ret = commserver();
 		if (strncmp(comm_mode, "server", 6) == 0) {
 			printf("\nStarting in Server Mode \n");
 			comm_server_ret = commserver();
+			//if (comm_server_ret<0) 
+			//	perror("commclient call failed");
 		} else if (strncmp(comm_mode, "client", 6) == 0) {
 			printf("\nStarting in Client Mode \n");
-			comm_client_ret = commclient();
+			comm_client_ret = commclient("checkpoint/chk_config.txt");
+			//if (comm_client_ret<0) 
+			//	perror("commclient call failed");
+			comm_client_ret = commclient("checkpoint/chk0_core0.dat");
+			//if (comm_client_ret<0) perror("commclient call failed");
+			comm_client_ret = commclient("checkpoint/chk0_mem.dat");
+			//if (comm_client_ret<0) perror("commclient call failed");
+			
 		} else {
-			printf("\nStarting without Client or Server, %s inner \n", comm_mode);
+			printf("\n Wrong Environmental Variable PROXY_COMM set\n it supports client and server supported atm\n", comm_mode);
 		}
 	}
 	else

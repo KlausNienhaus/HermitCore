@@ -38,6 +38,9 @@
 #include <errno.h>
 #include <signal.h>
 #include <time.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/time.h>
 
 #include "comm.h"
 
@@ -45,7 +48,7 @@
 
 //@brief:   Server side C function for TCP Socket Connections 
 //          atm recieves data file from client (e.g. checkpoint)
-int commserver(int argc, char const *argv[])
+int commserver(void)
 {
     int server_fd, new_socket, valread; //data_size;
     struct sockaddr_in address;
@@ -54,9 +57,12 @@ int commserver(int argc, char const *argv[])
     int addrlen = sizeof(address);
     char buffer[1024]= {0};
     //char *data_name,*data_position;
+    struct stat st = {0};
     
     comm_socket_header_t meta_data = {0};
 
+    if (stat("checkpoint", &st) == -1)
+		mkdir("checkpoint", 0700);
 
     // creating socket file descriptor
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
@@ -64,13 +70,14 @@ int commserver(int argc, char const *argv[])
         perror("socket failed");
         exit(EXIT_FAILURE);
     }
-      
+     /* 
     // enable reuse of port and address
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
     {
         perror("setsockopt failed");
         exit(EXIT_FAILURE);
     }
+    */
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons( PORT );
@@ -111,7 +118,8 @@ int commserver(int argc, char const *argv[])
         printf("metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
 
         // hardcoded for testing purposes atm
-        strcpy(meta_data.data_name, "checkpoint/chk_config_copy.txt"); //"checkpoint/testcopy_Abrechnung.xlsm"
+        //strcpy(meta_data.data_name, "checkpoint/chk_config_copy.txt"); //"checkpoint/testcopy_Abrechnung.xlsm"
+        
 
         // create file where data will be stored
         FILE *fp;
@@ -146,8 +154,14 @@ int commserver(int argc, char const *argv[])
                 printf("recieveddata: %d , %d, metafilesize: %d to filename: %s \n" , (recv_writen*sizeof(char)), recieved_fsize, meta_data.data_size, meta_data.data_name);
                 if (recieved_fsize == meta_data.data_size)
                 {
-                    printf("finished transfer \n");
-                    /*char *msg = "file recieved";
+                    printf("finished transfer\n");
+                    fflush(fp);
+                    fclose(fp);
+                    filesrecv++;
+                    printf("files: %d \n",filesrecv);
+                    
+                    /*
+                    char *msg = "file recieved";
                     if (send(new_socket, (void*)&msg, sizeof(buffer), 0)>0)
                     {
                         printf("send: %s", msg);
@@ -158,9 +172,7 @@ int commserver(int argc, char const *argv[])
                     printf("Error reading from socket\n");
                     perror("Reading buffer error");  
                 }
-                fflush(fp);
-                fclose(fp);
-                filesrecv++;
+                
                 break;
             }
         }
@@ -171,13 +183,13 @@ int commserver(int argc, char const *argv[])
         if (filesrecv>=3) break;
     }
 
-
+    //close(server_fd);
     return 0;
 }
 
 //@brief:   Client side C function for TCP Socket Connections 
 //          atm sends data file to server (e.g. checkpoint)
-int commclient(int argc, char const *argv[])
+int commclient(char *path)
 {
     struct sockaddr_in address;
     int sock = 0, valread, length; //data_size;
@@ -186,8 +198,12 @@ int commclient(int argc, char const *argv[])
     // char *data_name, *data_position;
     char *server_ip = "127.0.0.1";
     comm_socket_header_t meta_data;
+    //char name_arg[1024];
+    struct stat st = {0};
 
     //printf("start comm client \n");
+    
+    //printf("data_name_arg %s", argv[0]);
     
     // starting socket in IPv4 mode as AF_INET indicates
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
@@ -213,9 +229,15 @@ int commclient(int argc, char const *argv[])
         return -1;
     }
 
+    if (stat("checkpoint", &st) == -1)
+		mkdir("checkpoint", 0700);
+
     //setting the file to be transfered into place
-    strcpy(meta_data.data_name,"checkpoint/chk_config.txt"); //"checkpoint/Abrechnung.xlsm"
-    strcpy(meta_data.data_position,"checkpoint/");
+    //if (argv[0]>0)
+    //    strcpy(meta_data.data_name,argv[0]);
+    //else
+        strcpy(meta_data.data_name, path); //"checkpoint/Abrechnung.xlsm" "checkpoint/chk_config.txt"
+    strcpy(meta_data.data_position,"checkpoint");
 
     // open the file that we wish to transfer
     FILE *fp = fopen(meta_data.data_name,"rb");
@@ -276,7 +298,8 @@ int commclient(int argc, char const *argv[])
 
     }
 
-    /*char msg[1024]; 
+    /*
+    char msg[1024]; 
     while(1)
     {
         if (recv(sock, (void*)&msg, sizeof(buffer), 0)>0)

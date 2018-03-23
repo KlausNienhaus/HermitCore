@@ -67,6 +67,7 @@
 #include "uhyve-syscalls.h"
 #include "uhyve-net.h"
 #include "proxy.h"
+#include "comm.h"
 
 // define this macro to create checkpoints with KVM's dirty log
 //#define USE_DIRTY_LOG
