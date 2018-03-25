@@ -50,7 +50,7 @@
 //          atm recieves data file from client (e.g. checkpoint)
 int commserver(void)
 {
-    int server_fd, new_socket, valread; //data_size;
+    int server_fd, new_conn_fd, valread; //data_size;
     struct sockaddr_in address;
     int opt = 1;
     int filesrecv = 0;
@@ -93,26 +93,20 @@ int commserver(void)
         exit(EXIT_FAILURE);
     }
     //printf("waiting on connection by listen \n");
-    /*if ((new_socket = accept(server_fd, (struct sockaddr *)&address, 
-                       (socklen_t*)&addrlen))<0)
-    {
-        perror("accept failed");
-        exit(EXIT_FAILURE);
-    }*/
 
 
     while(1)
     {
-        if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0)
+        if ((new_conn_fd = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0)
         {
             perror("accept failed");
             exit(EXIT_FAILURE);
         }
         
         // recieving file metadata for positioning, name and size from client 
-        recv(new_socket, (void*)&meta_data.data_name, sizeof(buffer), 0);
-        recv(new_socket, (void*)&meta_data.data_size, sizeof(int), 0);
-        recv(new_socket, (void*)&meta_data.data_position, sizeof(buffer), 0);
+        recv(new_conn_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
+        recv(new_conn_fd, (void*)&meta_data.data_size, sizeof(int), 0);
+        recv(new_conn_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
         printf("metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
 
         // hardcoded for testing purposes atm
@@ -134,7 +128,7 @@ int commserver(void)
         {
             // first read file in chunks of buffer bytes
             int recv_writen = 0;
-            int valrecv = recv(new_socket , buffer, sizeof(buffer), 0);
+            int valrecv = recv(new_conn_fd , buffer, sizeof(buffer), 0);
             //printf("Bytes recieved %d \n", valrecv);        
             // if recv was success, write data to file.
             if(valrecv > 0)
@@ -176,7 +170,7 @@ int commserver(void)
         }
 
         printf("finished file transfer closing socket and waiting for new connection\n");
-        close(new_socket);
+        close(new_conn_fd);
         sleep(1);
         if (filesrecv>=3) 
         {
@@ -185,30 +179,37 @@ int commserver(void)
         }
     }
 
-    //close(server_fd);
+    close(server_fd);
     return 0;
 }
 
 //@brief:   Client side C function for TCP Socket Connections 
 //          atm sends data file to server (e.g. checkpoint)
-int commclient(char *path, char *position)
+int commclient(char *path, char *position, char *server_ip)
 {
     struct sockaddr_in address;
-    int sock = 0, valread, length; //data_size;
     struct sockaddr_in serv_addr;
+    int client_fd = 0, valread, length; //data_size;
     char buffer[1024] = {0};
-    // char *data_name, *data_position;
-    char *server_ip = "127.0.0.1";
+    char *serv_ip = "127.0.0.1";
     comm_socket_header_t meta_data;
+    // char *data_name, *data_position;
     //char name_arg[1024];
     struct stat st = {0};
 
+    if (server_ip)
+        strcpy(meta_data.data_name, path);
+    else
+    {
+        printf("\nInvalid address/ Address not supported, falling back to loop adr \n");
+        strcpy(serv_ip, "127.0.0.1");
+    }
     //printf("start comm client \n");
     
     //printf("data_name_arg %s", argv[0]);
     
     // starting socket in IPv4 mode as AF_INET indicates
-    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
         printf("\n Socket creation error \n");
         return -1;
@@ -219,13 +220,13 @@ int commclient(char *path, char *position)
     serv_addr.sin_port = htons(PORT);
       
     // Convert IPv4 (and IPv6) addresses from text to binary form
-    if(inet_pton(AF_INET, server_ip, &serv_addr.sin_addr)<=0) 
+    if(inet_pton(AF_INET, serv_ip, &serv_addr.sin_addr)<=0) 
     {
         printf("\nInvalid address/ Address not supported \n");
         return -1;
     }
     // Connect to Server with assambeled information in struct serv_addr
-    if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+    if (connect(client_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
     {
         printf("\nConnection Failed \n");
         return -1;
@@ -251,9 +252,9 @@ int commclient(char *path, char *position)
    
     // sending file meta information to server before sending file
     printf("metafilesize: %d to filename: %s and position: %s \n " , meta_data.data_size, meta_data.data_name, meta_data.data_position);
-    int nsent = send(sock, (void*)&meta_data.data_name, sizeof(buffer), 0);
-    nsent += send(sock, (void*)&meta_data.data_size, sizeof(int), 0);
-    nsent += send(sock, (void*)&meta_data.data_position, sizeof(buffer), 0);
+    int nsent = send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
+    nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(int), 0);
+    nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
     if (nsent < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
         {
             perror("Meta_data not correct send \n");
@@ -273,7 +274,7 @@ int commclient(char *path, char *position)
         if(nread > 0)
         {
             //printf("Sending \n");
-            send(sock, buffer, nread, 0);
+            send(client_fd, buffer, nread, 0);
         }
 
         
@@ -310,7 +311,7 @@ int commclient(char *path, char *position)
         }
     }*/
     
-    close(sock);
+    close(client_fd);
     return 0;
 }
 

@@ -1047,9 +1047,7 @@ int main(int argc, char **argv)
 	int comm_server_ret;
 	int comm_client_ret;
 	char* comm_mode; 
-	char name_arg[1024] = "checkpoint/chk_config.txt";
-
-	printf("name_arg: %s\n",name_arg);
+	
 
 	comm_mode = getenv("PROXY_COMM");
 	printf("PROXY_COMM is set to: %s\n",comm_mode);

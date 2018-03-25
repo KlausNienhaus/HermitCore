@@ -1514,9 +1514,9 @@ nextslot:
 
 	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
 	{
-		commclient("checkpoint/chk_config.txt","checkpoint");
-		commclient("checkpoint/chk0_core0.dat","checkpoint");
-		commclient("checkpoint/chk0_mem.dat","checkpoint");
+		commclient("checkpoint/chk_config.txt","checkpoint","127.0.0.1");
+		commclient("checkpoint/chk0_core0.dat","checkpoint","127.0.0.1");
+		commclient("checkpoint/chk0_mem.dat","checkpoint","127.0.0.1");
 		printf("Client transfered checkpoint and stops execution now");
 		sigterm_handler(SIGTERM);
 	}
