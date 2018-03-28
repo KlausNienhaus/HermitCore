@@ -1102,6 +1102,8 @@ static void save_cpu_state(void)
 	if (fwrite(&mp_state, sizeof(mp_state), 1, f) != 1)
 		err(1, "fwrite failed\n");
 
+	//comm_register_client(&sregs, &regs, &fpu, &msr_data, &lapic, &xsave, &xcrs, &events, &mp_state,);
+
 	fclose(f);
 }
 
@@ -1382,6 +1384,8 @@ static void timer_handler(int signum)
 	kvm_ioctl(vmfd, KVM_GET_CLOCK, &clock);
 	if (fwrite(&clock, sizeof(clock), 1, f) != 1)
 		err(1, "fwrite failed");
+	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
+		comm_clock_client(&clock,"127.0.0.1" ,"memory", "clock");
 
 #if 0
 	if (fwrite(guest_mem, guest_size, 1, f) != 1)
@@ -1466,6 +1470,9 @@ nextslot:
 								err(1, "fwrite failed");
 							if (fwrite((size_t*) (guest_mem + (pgt[l] & PAGE_MASK)), (1UL << PAGE_BITS), 1, f) != 1)
 								err(1, "fwrite failed");
+							if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
+								comm_memchunk_client(&pgt_entry, (size_t*)(guest_mem + (pgt[l] & PAGE_MASK)), (1UL << PAGE_BITS), "127.0.0.1", "mem");
+
 						}
 					}
 				} else if ((pgd[k] & flag) == flag) {
@@ -1476,6 +1483,8 @@ nextslot:
 						err(1, "fwrite failed");
 					if (fwrite((size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), (1UL << PAGE_2M_BITS), 1, f) != 1)
 						err(1, "fwrite failed");
+					if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
+						comm_memchunk_client(pgd+k, (size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), (1UL << PAGE_2M_BITS), "127.0.0.1", "mem");
 				}
 			}
 		}

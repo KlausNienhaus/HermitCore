@@ -32,14 +32,35 @@
 #define _GNU_SOURCE
 #endif
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <stddef.h>
+#include <arpa/inet.h>
+#include <string.h>
+#include <unistd.h>
+#include <errno.h>
+#include <signal.h>
+#include <time.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/time.h>
+#include <linux/const.h>
+#include <linux/kvm.h>
+
 // struct for information size and data name
 typedef struct{
-	int	    data_size;	/* Data Size  */
+	uint	    data_size;	/* Data Size  */
 	char	data_name[1024];	/* File Name   */
     char    data_position[1024]; /* Data/File Path */
 } comm_socket_header_t;
 
 int commserver(void);
 int commclient(char *path, char *position, char *server_ip);
+
+int comm_clock_client(struct kvm_clock_data clock, char *server_ip, char *comm_type, char *comm_subtype);
+int comm_chunk_client(size_t *pgdpgt, size_t *mem_chuck, unsigned long masksize, char *server_ip, char *comm_type, char *comm_subtype);
+//int comm_register_client(char *path, char *position, char *server_ip);
 
 #endif
