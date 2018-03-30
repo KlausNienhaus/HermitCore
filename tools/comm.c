@@ -191,14 +191,14 @@ int commclient(char *path, char *position, char *server_ip)
     struct sockaddr_in serv_addr;
     int client_fd = 0, valread, length; //data_size;
     char buffer[1024] = {0};
-    char *serv_ip = "127.0.0.1";
+    char *serv_ip; // = "127.0.0.1";
     comm_socket_header_t meta_data;
     // char *data_name, *data_position;
     //char name_arg[1024];
     struct stat st = {0};
 
     if (server_ip)
-        strcpy(meta_data.data_name, path);
+        strcpy(serv_ip, server_ip);
     else
     {
         printf("\nInvalid address/ Address not supported, falling back to loop adr \n");
@@ -233,7 +233,7 @@ int commclient(char *path, char *position, char *server_ip)
     }
 
 
-    strcpy(meta_data.data_name, path); //"checkpoint/Abrechnung.xlsm" "checkpoint/chk_config.txt"
+    strcpy(meta_data.data_name, path); //"checkpoint/chk_config.txt"
     strcpy(meta_data.data_position, position);
     if (stat(meta_data.data_position, &st) == -1)
 		mkdir(meta_data.data_position, 0700);
