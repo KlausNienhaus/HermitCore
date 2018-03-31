@@ -29,6 +29,7 @@
 #define _GNU_SOURCE
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stddef.h>
 #include <arpa/inet.h>
@@ -48,6 +49,8 @@
 #include "comm.h"
 
 #define PORT 3490
+
+#define MAX_MSR_ENTRIES	25
 
 /// Page offset bits
 #define PAGE_BITS			12
@@ -82,8 +85,9 @@ int commserver(void)
     struct stat st = {0};
     size_t location;
 	int ret;
-    
     comm_socket_header_t meta_data = {0};
+    comm_register_t recv_vcpu_register = {0};
+    comm_config_t recv_config_register = {0};
 
 
     // creating socket file descriptor
@@ -143,9 +147,7 @@ int commserver(void)
             while (nrecv<meta_data.data_size)
                 nrecv += recv(new_conn_fd, (void*)&clock+nrecv, sizeof(clock)-nrecv,0);
         }
-
-
-        if (meta_data.data_name=="memory" && meta_data.data_position=="NULL")
+        else if (meta_data.data_name=="memory" && meta_data.data_position=="NULL")
         {
             size_t pgdpgt, mem_chunck;
             uint masksize;
@@ -162,24 +164,7 @@ int commserver(void)
             if ((nrecv1+nrecv2+nrecv3)<(sizeof(pgdpgt)+sizeof(mem_chunck)+sizeof(masksize)))
                 perror("Memory Chunk incomplete");
 
-        }
-
-        if (meta_data.data_name=="register" && meta_data.data_position=="NULL")
-        {
-            size_t pgdpgt, mem_chunck;
-            uint masksize;
-
-            int nrecv = 0;
-            nrecv += recv(new_conn_fd, (void*)pgdpgt, sizeof(size_t), 0);
-            nrecv += recv(new_conn_fd, (void*)mem_chunck, sizeof(size_t), 0);
-            nrecv += recv(new_conn_fd, (void*)masksize, sizeof(unsigned long), 0);
-            if (nrecv<(sizeof(pgdpgt)+sizeof(mem_chunck)+sizeof(masksize)))
-                perror("Memory Chunk incomplete");
-
-        }
-
-
- /*
+/*
         size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
         The function fread() reads nmemb items of data, each size bytes long, from the stream pointed to by stream, storing them at the location given by ptr.
 
@@ -189,7 +174,7 @@ int commserver(void)
 (pgd+k,sizeof(size_t),(size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)),(1UL << PAGE_2M_BITS));
 (&pgt_entry,sizeof(size_t),(size_t*)(guest_mem + (pgt[l] & PAGE_MASK)),(1UL << PAGE_BITS));
 
-while (fread(&location, sizeof(location), 1, f) == 1) {
+        while (fread(&location, sizeof(location), 1, f) == 1) {
 			//printf("location 0x%zx\n", location);
 			if (location & PG_PSE)
 				ret = fread((size_t*) (mem + (location & PAGE_2M_MASK)), (1UL << PAGE_2M_BITS), 1, f);
@@ -210,10 +195,26 @@ if (masksize == (1UL << PAGE_2M_BITS))
 		mkdir(meta_data.data_position, 0700);
 
 */  
-        
+
+        }
+        else if (meta_data.data_name=="register" && meta_data.data_position=="NULL")
+        {
+            int nrecv = 0;
+            while (nrecv<sizeof(recv_vcpu_register))
+                nrecv += recv(new_conn_fd, (void*)&recv_vcpu_register+nrecv, sizeof(recv_vcpu_register)-nrecv, 0);
+            if (nrecv<(sizeof(recv_vcpu_register)))
+                perror("Register recieved incomplete");
+        }
+        else if (meta_data.data_name=="config" && meta_data.data_position=="NULL")
+        {
+            int nrecv = 0;
+            while (nrecv<sizeof(recv_config_register))
+                nrecv += recv(new_conn_fd, (void*)&recv_config_register+nrecv, sizeof(recv_config_register)-nrecv, 0);
+            if (nrecv<(sizeof(recv_config_register)))
+                perror("Register recieved incomplete");
+        }
         else
         {
-
         // hardcoded for testing purposes atm
         //strcpy(meta_data.data_name, "checkpoint/chk_config_copy.txt"); //"checkpoint/testcopy_Abrechnung.xlsm"
         if (stat(meta_data.data_position, &st) == -1)
@@ -266,8 +267,8 @@ if (masksize == (1UL << PAGE_2M_BITS))
                 }
                 if (ferror(fp))
                 {
-                    printf("Error reading from socket\n");
-                    perror("Reading buffer error");  
+                    printf("\nError reading from socket\n");
+                    perror("\nReading buffer error");  
                 }
                 
                 break;
@@ -275,12 +276,12 @@ if (masksize == (1UL << PAGE_2M_BITS))
         }
         }
 
-        printf("finished file transfer closing socket and waiting for new connection\n");
+        printf("\nfinished file transfer closing socket and waiting for new connection\n");
         close(new_conn_fd);
         sleep(1);
         if (filesrecv>=3) 
         {
-            printf("recieved all checkpoint files starting up system\n");
+            printf("\nrecieved all checkpoint files starting up system\n");
             break;
         }
     }
@@ -289,10 +290,88 @@ if (masksize == (1UL << PAGE_2M_BITS))
     return 0;
 }
 
-//@brief:   Client side C function for TCP Socket Connections sending Memory Chunk
-//          atm sends pgd or pgt with corresponding memory to server (e.g. checkpoint)
+//@brief:   Client side C function for TCP Socket Connections sending Config
+//          atm sends Config to server (e.g. checkpoint)
+int comm_config_client(comm_config_t *config_struct, char *server_ip, char *comm_type, char *comm_subtype)
+{
+    struct sockaddr_in address;
+    struct sockaddr_in serv_addr;
+    int client_fd = 0, valread; //data_size;
+    char buffer[1024] = {0};
+    char *serv_ip; // = "127.0.0.1";
+    comm_socket_header_t meta_data;
+    // char *data_name, *data_position;
+    //char name_arg[1024];
+    //struct stat st = {0};
+     
+    if (server_ip)
+        strcpy(serv_ip, server_ip);
+    else
+    {
+        printf("\nInvalid address/ Address not supported, falling back to loop adr \n");
+        strcpy(serv_ip, "127.0.0.1");
+    }
+    //printf("start comm client \n");
+    
+    //printf("data_name_arg %s", argv[0]);
+    
+    // starting socket in IPv4 mode as AF_INET indicates
+    if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        printf("\n Socket creation error \n");
+        return -1;
+    }
+  
+    memset(&serv_addr, '0', sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(PORT);
+      
+    // Convert IPv4 (and IPv6) addresses from text to binary form
+    if(inet_pton(AF_INET, server_ip, &serv_addr.sin_addr)<=0) 
+    {
+        printf("\nInvalid address/ Address not supported \n");
+        return -1;
+    }
+    // Connect to Server with assambeled information in struct serv_addr
+    if (connect(client_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+    {
+        printf("\nConnection Failed \n");
+        return -1;
+    }
+    
+    //data_name and data_position in this case codes the type of transfer comming for comm_server
+    strcpy(meta_data.data_name, comm_type);
+    strcpy(meta_data.data_position, comm_subtype);
+    meta_data.data_size = (sizeof(config_struct));
+    int nsent = send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
+    nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(config_struct), 0);
+    nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
+    if (nsent < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
+        {
+            perror("\nMeta_data not correct send \n");
+            return -1;
+        } 
 
-int comm_clock_client(struct kvm_clock_data clock, char *server_ip, char *comm_type, char *comm_subtype)
+    //printf("Sending \n");
+    int nsent=0;
+    while(nsent<sizeof(config_struct))
+    {
+        nsent += send(client_fd, (void*)&config_struct+nsent, sizeof(config_struct)-nsent, 0);
+    }
+    if (nsent < (sizeof(config_struct)))
+        {
+            perror("\nClock not correct send \n");
+            return -1;
+        } 
+   
+    close(client_fd);
+    return 0;
+}
+
+
+//@brief:   Client side C function for TCP Socket Connections sending Clock
+//          atm sends clock to server (e.g. checkpoint)
+int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_type, char *comm_subtype)
 {
     struct sockaddr_in address;
     struct sockaddr_in serv_addr;
@@ -348,7 +427,7 @@ int comm_clock_client(struct kvm_clock_data clock, char *server_ip, char *comm_t
     nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
     if (nsent < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
         {
-            perror("Meta_data not correct send \n");
+            perror("\nMeta_data not correct send \n");
             return -1;
         } 
 
@@ -360,7 +439,7 @@ int comm_clock_client(struct kvm_clock_data clock, char *server_ip, char *comm_t
     }
     if (nsent < (sizeof(clock)))
         {
-            perror("Clock not correct send \n");
+            perror("\nClock not correct send \n");
             return -1;
         } 
    
@@ -371,7 +450,6 @@ int comm_clock_client(struct kvm_clock_data clock, char *server_ip, char *comm_t
 
 //@brief:   Client side C function for TCP Socket Connections sending Memory Chunk
 //          atm sends pgd or pgt with corresponding memory to server (e.g. checkpoint)
-
 int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, unsigned long masksize, char *server_ip, char *comm_type, char *comm_subtype)
 {
     struct sockaddr_in address;
@@ -428,7 +506,7 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, unsigned long masksize
     nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
     if (nsent < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
         {
-            perror("Meta_data not correct send \n");
+            perror("\nMeta_data not correct send \n");
             return -1;
         } 
 
@@ -444,7 +522,7 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, unsigned long masksize
         nsent3 += send(client_fd, (void*)masksize+nsent3, sizeof(unsigned long)-nsent3, 0);
     if ((nsent1+nsent2+nsent3) < (sizeof(pgdpgt)+sizeof(mem_chunck)+sizeof(masksize)))
         {
-            perror("Memory not correct send not correct send \n");
+            perror("\nMemory not correct send not correct send \n");
             return -1;
         } 
    
@@ -513,7 +591,7 @@ int commclient(char *path, char *position, char *server_ip)
     FILE *fp = fopen(meta_data.data_name,"rb");
     if(fp==NULL)
     {
-        printf("File open error \n");
+        printf("\nFile open error \n");
         return 1;   
     } 
      
@@ -528,7 +606,7 @@ int commclient(char *path, char *position, char *server_ip)
     nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
     if (nsent < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
         {
-            perror("Meta_data not correct send \n");
+            perror("\nMeta_data not correct send \n");
             return -1;
         } 
 
@@ -553,14 +631,14 @@ int commclient(char *path, char *position, char *server_ip)
         if (nread < sizeof(buffer))
         {
             if (feof(fp))
-                printf("End of file\n");
+                printf("\nEnd of file\n");
                 
             if (ferror(fp))
             {
-                printf("Error reading from file\n");
-                perror("Sending buffer error");
+                printf("\nError reading from file\n");
+                perror("\nSending buffer error");
             }
-            printf("Closing filedescriptor\n");
+            printf("\nClosing filedescriptor\n");
             fclose(fp);
             break;
         }
@@ -638,10 +716,11 @@ if (masksize == (1UL << PAGE_2M_BITS))
 
 */
 
-/*
-//@brief:   Client side C function for TCP Socket Connections 
+
+//@brief:   Comm function for sending VCPU register for checkpoint transfer
 //          atm sends data file to server (e.g. checkpoint)
-int comm_register_client(char *path, char *position, char *server_ip, char *comm_type, char *comm_subtype)
+int comm_register_client(struct kvm_sregs *sregs, struct kvm_regs *regs, struct kvm_fpu *fpu, struct msr_data *msr_data, struct kvm_lapic_state *lapic,
+struct kvm_xsave *xsave, struct kvm_xcrs *xcrs, struct kvm_vcpu_events *events,struct kvm_mp_state *mp_state, char server_ip, char *comm_type, char *comm_subtype)
 {
     struct sockaddr_in address;
     struct sockaddr_in serv_addr;
@@ -649,12 +728,20 @@ int comm_register_client(char *path, char *position, char *server_ip, char *comm
     char buffer[1024] = {0};
     char *serv_ip; // = "127.0.0.1";
     comm_socket_header_t meta_data;
-    // char *data_name, *data_position;
-    //char name_arg[1024];
-    //struct stat st = {0};
-    size_t* pgd_pgt_entry, guest_mem;
-    unsigned long size;
-    char *comm_type = "register";
+    //char *comm_type = "register";
+    //char *comm_type = "NULL";
+    comm_register_t all_vcpu_register;
+
+    all_vcpu_register.sregs=*sregs;
+    all_vcpu_register.regs=*regs;
+    all_vcpu_register.fpu=*fpu;
+    all_vcpu_register.msr_data=*msr_data;
+    all_vcpu_register.lapic=*lapic;
+    all_vcpu_register.xsave=*xsave;
+    all_vcpu_register.xcrs=*xcrs;
+    all_vcpu_register.events=*events;
+    all_vcpu_register.mp_state=*mp_state;
+
 
     if (server_ip)
         strcpy(serv_ip, server_ip);
@@ -691,13 +778,14 @@ int comm_register_client(char *path, char *position, char *server_ip, char *comm
         return -1;
     }
     
+
     //path in this case codes the type of transfer comming
     strcpy(meta_data.data_name, comm_type);
     strcpy(meta_data.data_position, comm_subtype);
-    meta_data.data_size = (sizeof(pgdpgt)+sizeof(mem_chunck)+sizeof(masksize));
-    int nsent = send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
+    meta_data.data_size = (sizeof(all_vcpu_register));
+    int nsent = send(client_fd, (void*)meta_data.data_name, sizeof(buffer), 0);
     nsent += send(client_fd, (void*)meta_data.data_size, sizeof(uint), 0);
-    nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
+    nsent += send(client_fd, (void*)meta_data.data_position, sizeof(buffer), 0);
     if (nsent < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
         {
             perror("Meta_data not correct send \n");
@@ -706,25 +794,16 @@ int comm_register_client(char *path, char *position, char *server_ip, char *comm
 
     //printf("Sending \n");
     int nsent=0;
-    while(nsent<sizeof(pgdpgt))
+    while(nsent<sizeof(all_vcpu_register))
     {
-        nsent += send(client_fd, (void*)pgdpgt, sizeof(size_t), 0);
+        nsent += send(client_fd, (void*)&all_vcpu_register+nsent, sizeof(all_vcpu_register)-nsent, 0);
     }
-    while(nsent<(sizeof(pgdpgt)+sizeof(mem_chunck)))
-    {
-        nsent += send(client_fd, (void*)mem_chunck, sizeof(size_t), 0);
-    }
-    while(nsent<(sizeof(pgdpgt)+sizeof(mem_chunck)+sizeof(masksize)))    
-    {
-        nsent += send(client_fd, (void*)masksize, sizeof(unsigned long), 0);
-    }
-    if (nsent < (sizeof(pgdpgt)+sizeof(mem_chunck)+sizeof(masksize)))
+    if (nsent < (sizeof(all_vcpu_register)))
         {
-            perror("Memory not correct send not correct send \n");
+            perror("Register not correct send \n");
             return -1;
         } 
    
     close(client_fd);
     return 0;
 }
-*/

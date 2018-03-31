@@ -33,6 +33,7 @@
 #endif
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stddef.h>
 #include <arpa/inet.h>
@@ -49,18 +50,46 @@
 #include <linux/const.h>
 #include <linux/kvm.h>
 
+#define MAX_MSR_ENTRIES	25
+
 // struct for information size and data name
 typedef struct{
-	uint	    data_size;	/* Data Size  */
+	uint	data_size;	/* Data Size  */
 	char	data_name[1024];	/* File Name   */
     char    data_position[1024]; /* Data/File Path */
 } comm_socket_header_t;
 
+typedef struct{
+	struct msr_data{
+		struct kvm_msrs info;
+		struct kvm_msr_entry entries[MAX_MSR_ENTRIES];
+	} msr_data;
+
+	struct kvm_regs regs;
+	struct kvm_sregs sregs;
+	struct kvm_fpu fpu;
+	struct kvm_lapic_state lapic;
+	struct kvm_xsave xsave;
+	struct kvm_xcrs xcrs;
+	struct kvm_vcpu_events events;
+	struct kvm_mp_state mp_state;
+}comm_register_t;
+
+typedef struct{
+	uint32_t 	*ncores; 
+	size_t		*guest_size; 
+	uint32_t 	*no_checkpoint; 
+	uint64_t 	*elf_entry; 
+	bool 		*full_checkpoint;
+}comm_config_t;
+
 int commserver(void);
 int commclient(char *path, char *position, char *server_ip);
 
-int comm_clock_client(struct kvm_clock_data clock, char *server_ip, char *comm_type, char *comm_subtype);
+int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_type, char *comm_subtype);
 int comm_chunk_client(size_t *pgdpgt, size_t *mem_chuck, unsigned long masksize, char *server_ip, char *comm_type, char *comm_subtype);
-//int comm_register_client(char *path, char *position, char *server_ip);
+int comm_register_client(struct kvm_sregs *sregs, struct kvm_regs *regs, struct kvm_fpu *fpu, struct msr_data *msr_data, struct kvm_lapic_state *lapic,
+struct kvm_xsave *xsave, struct kvm_xcrs *xcrs, struct kvm_vcpu_events *events,struct kvm_mp_state *mp_state, char server_ip, char *comm_type, char *comm_subtype);
+int comm_config_client(comm_config_t *config_struct, char *server_ip, char *comm_type, char *comm_subtype);
 
 #endif

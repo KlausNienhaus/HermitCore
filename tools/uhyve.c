@@ -1047,7 +1047,8 @@ static void save_cpu_state(void)
 	struct kvm_mp_state mp_state;
 	char fname[MAX_FNAME];
 	int n = 0;
-
+	
+	
 	/* define the list of required MSRs */
 	msrs[n++].index = MSR_IA32_APICBASE;
 	msrs[n++].index = MSR_IA32_SYSENTER_CS;
@@ -1083,6 +1084,20 @@ static void save_cpu_state(void)
 		err(1, "fopen: unable to open file\n");
 	}
 
+/*
+	comm_register_t checkpoint_register;
+//	checkpoint_register.msrs=checkpoint_register.msr_data.entries;
+	checkpoint_register.sregs=sregs;
+	checkpoint_register.regs=regs;
+	checkpoint_register.fpu=fpu;
+	checkpoint_register.msr_data=msr_data;
+	checkpoint_register.lapic=lapic;
+	checkpoint_register.xsave=xsave;
+	checkpoint_register.xcrs=xcrs;
+	checkpoint_register.events=events;
+	checkpoint_register.mp_state=mp_state;
+*/
+
 	if (fwrite(&sregs, sizeof(sregs), 1, f) != 1)
 		err(1, "fwrite failed\n");
 	if (fwrite(&regs, sizeof(regs), 1, f) != 1)
@@ -1102,7 +1117,7 @@ static void save_cpu_state(void)
 	if (fwrite(&mp_state, sizeof(mp_state), 1, f) != 1)
 		err(1, "fwrite failed\n");
 
-	//comm_register_client(&sregs, &regs, &fpu, &msr_data, &lapic, &xsave, &xcrs, &events, &mp_state,);
+	comm_register_client(&sregs, &regs, &fpu, &msr_data, &lapic, &xsave, &xcrs, &events, &mp_state, "127.0.0.1", "register" , "NULL");
 
 	fclose(f);
 }
@@ -1385,7 +1400,7 @@ static void timer_handler(int signum)
 	if (fwrite(&clock, sizeof(clock), 1, f) != 1)
 		err(1, "fwrite failed");
 	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
-		comm_clock_client(&clock,"127.0.0.1" ,"memory", "clock");
+		comm_clock_client(&clock, "127.0.0.1", "memory", "clock");
 
 #if 0
 	if (fwrite(guest_mem, guest_size, 1, f) != 1)
@@ -1431,6 +1446,8 @@ nextslot:
 						err(1, "fwrite failed");
 					if (fwrite((size_t*) (guest_mem + addr), PAGE_SIZE, 1, f) != 1)
 						err(1, "fwrite failed");
+					if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
+						comm_chunk_client(&addr, (size_t*) (guest_mem + addr), PAGE_SIZE, "127.0.0.1", "mem","Pageaddr");
 				}
 			}
 		}
@@ -1471,7 +1488,7 @@ nextslot:
 							if (fwrite((size_t*) (guest_mem + (pgt[l] & PAGE_MASK)), (1UL << PAGE_BITS), 1, f) != 1)
 								err(1, "fwrite failed");
 							if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
-								comm_memchunk_client(&pgt_entry, (size_t*)(guest_mem + (pgt[l] & PAGE_MASK)), (1UL << PAGE_BITS), "127.0.0.1", "mem");
+								comm_chunk_client(&pgt_entry, (size_t*)(guest_mem + (pgt[l] & PAGE_MASK)), (1UL << PAGE_BITS), "127.0.0.1", "mem","NULL");
 
 						}
 					}
@@ -1484,7 +1501,7 @@ nextslot:
 					if (fwrite((size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), (1UL << PAGE_2M_BITS), 1, f) != 1)
 						err(1, "fwrite failed");
 					if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
-						comm_memchunk_client(pgd+k, (size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), (1UL << PAGE_2M_BITS), "127.0.0.1", "mem");
+						comm_chunk_client(pgd+k, (size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), (1UL << PAGE_2M_BITS), "127.0.0.1", "mem","NULL");
 				}
 			}
 		}
@@ -1504,13 +1521,21 @@ nextslot:
 	fprintf(f, "number of cores: %u\n", ncores);
 	fprintf(f, "memory size: 0x%zx\n", guest_size);
 	fprintf(f, "checkpoint number: %u\n", no_checkpoint);
-	fprintf(f, "entry point: 0x%zx", elf_entry);
+	fprintf(f, "entry point: 0x%zx\n", elf_entry);
 	if (full_checkpoint)
 		fprintf(f, "full checkpoint: 1");
 	else
 		fprintf(f, "full checkpoint: 0");
 
 	fclose(f);
+	comm_config_t struct_config;
+	struct_config.ncores=ncores;
+	struct_config.guest_size=guest_size;
+	struct_config.no_checkpoint=no_checkpoint;
+	struct_config.elf_entry;
+	struct_config.full_checkpoint;
+	comm_config_client(&struct_config, "127.0.0.1", "config", "NULL");
+
 
 	if (verbose) {
 		gettimeofday(&end, NULL);
@@ -1526,7 +1551,7 @@ nextslot:
 		commclient("checkpoint/chk_config.txt","checkpoint","127.0.0.1");
 		commclient("checkpoint/chk0_core0.dat","checkpoint","127.0.0.1");
 		commclient("checkpoint/chk0_mem.dat","checkpoint","127.0.0.1");
-		printf("Client transfered checkpoint and stops execution now");
+		printf("Client transfered checkpoint and stops execution now\n");
 		sigterm_handler(SIGTERM);
 	}
 	
