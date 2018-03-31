@@ -1025,7 +1025,6 @@ int monitor_main(int argc, char **argv)
 	if (ret)
 		return ret;
 
-
 	switch(monitor) {
 	case UHYVE:
 		return uhyve_loop();
@@ -1053,8 +1052,6 @@ int main(int argc, char **argv)
 	printf("PROXY_COMM is set to: %s\n",comm_mode);
 	if (comm_mode)
 	{
-		//printf("\nStarting in Server Mode \n");
-		//comm_server_ret = commserver();
 		if (strncmp(comm_mode, "server", 6) == 0) {
 			printf("\nStarting in Server Mode \n");
 			comm_server_ret = commserver();

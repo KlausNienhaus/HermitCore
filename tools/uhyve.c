@@ -1163,7 +1163,7 @@ int uhyve_init(char *path)
 		fscanf(f, "number of cores: %u\n", &ncores);
 		fscanf(f, "memory size: 0x%zx\n", &guest_size);
 		fscanf(f, "checkpoint number: %u\n", &no_checkpoint);
-		fscanf(f, "entry point: 0x%zx", &elf_entry);
+		fscanf(f, "entry point: 0x%zx\n", &elf_entry);
 		fscanf(f, "full checkpoint: %d", &tmp);
 		full_checkpoint = tmp ? true : false;
 
@@ -1361,6 +1361,7 @@ static void timer_handler(int signum)
 
 	pthread_barrier_wait(&barrier);
 
+
 	save_cpu_state();
 
 	snprintf(fname, MAX_FNAME, "checkpoint/chk%u_mem.dat", no_checkpoint);
@@ -1487,6 +1488,7 @@ nextslot:
 	pthread_barrier_wait(&barrier);
 
 	// update configuration file
+	//FILE* 
 	f = fopen("checkpoint/chk_config.txt", "w");
 	if (f == NULL) {
 		err(1, "fopen: unable to open file");
@@ -1503,6 +1505,7 @@ nextslot:
 
 	fclose(f);
 
+
 	if (verbose) {
 		gettimeofday(&end, NULL);
 		size_t msec = (end.tv_sec - begin.tv_sec) * 1000;
@@ -1514,9 +1517,9 @@ nextslot:
 
 	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
 	{
-		commclient("checkpoint/chk_config.txt","checkpoint","127.0.0.1");
-		commclient("checkpoint/chk0_core0.dat","checkpoint","127.0.0.1");
-		commclient("checkpoint/chk0_mem.dat","checkpoint","127.0.0.1");
+		commclient("checkpoint/chk_config.txt", "checkpoint", "127.0.0.1");
+		commclient("checkpoint/chk0_core0.dat", "checkpoint", "127.0.0.1");
+		commclient("checkpoint/chk0_mem.dat", "checkpoint", "127.0.0.1");
 		printf("Client transfered checkpoint and stops execution now");
 		sigterm_handler(SIGTERM);
 	}

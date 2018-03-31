@@ -187,6 +187,7 @@ int commserver(void)
 //          atm sends data file to server (e.g. checkpoint)
 int commclient(char *path, char *position, char *server_ip)
 {
+    //printf("\nat Start Server_IP: %s\n", server_ip);
     struct sockaddr_in address;
     struct sockaddr_in serv_addr;
     int client_fd = 0, valread, length; //data_size;
@@ -197,6 +198,8 @@ int commclient(char *path, char *position, char *server_ip)
     //char name_arg[1024];
     struct stat st = {0};
 
+    //printf("\nServer_IP: %s\n", server_ip);
+
     if (server_ip)
         strcpy(serv_ip, server_ip);
     else
@@ -206,7 +209,7 @@ int commclient(char *path, char *position, char *server_ip)
     }
     //printf("start comm client \n");
     
-    //printf("data_name_arg %s", argv[0]);
+    //printf("\nServ_IP: %s\n", serv_ip);
     
     // starting socket in IPv4 mode as AF_INET indicates
     if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
@@ -289,8 +292,9 @@ int commclient(char *path, char *position, char *server_ip)
                 printf("Error reading from file\n");
                 perror("Sending buffer error");
             }
-            printf("Closing filedescriptor\n");
+            printf("Closing file descriptor and socket file descriptor\n");
             fclose(fp);
+            //printf("after fclose(fp) before break\n");
             break;
         }
 
@@ -310,8 +314,8 @@ int commclient(char *path, char *position, char *server_ip)
             }
         }
     }*/
-    
     close(client_fd);
+    //printf("after client_fd closed before return\n");
     return 0;
 }
 
