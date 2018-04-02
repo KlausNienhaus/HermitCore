@@ -165,7 +165,7 @@
 #define IOAPIC_DEFAULT_BASE	0xfec00000
 #define APIC_DEFAULT_BASE	0xfee00000
 
-
+static bool called_by_migration =false;
 static bool restart = false;
 static bool cap_tsc_deadline = false;
 static bool cap_irqchip = false;
@@ -1084,19 +1084,19 @@ static void save_cpu_state(void)
 		err(1, "fopen: unable to open file\n");
 	}
 
-/*
+
 	comm_register_t checkpoint_register;
 //	checkpoint_register.msrs=checkpoint_register.msr_data.entries;
-	checkpoint_register.sregs=sregs;
-	checkpoint_register.regs=regs;
-	checkpoint_register.fpu=fpu;
-	checkpoint_register.msr_data=msr_data;
-	checkpoint_register.lapic=lapic;
-	checkpoint_register.xsave=xsave;
-	checkpoint_register.xcrs=xcrs;
-	checkpoint_register.events=events;
-	checkpoint_register.mp_state=mp_state;
-*/
+	checkpoint_register.sregs=&sregs;
+	checkpoint_register.regs=&regs;
+	checkpoint_register.fpu=&fpu;
+	checkpoint_register.msr_data=&msr_data;
+	checkpoint_register.lapic=&lapic;
+	checkpoint_register.xsave=&xsave;
+	checkpoint_register.xcrs=&xcrs;
+	checkpoint_register.events=&events;
+	checkpoint_register.mp_state=&mp_state;
+
 
 	if (fwrite(&sregs, sizeof(sregs), 1, f) != 1)
 		err(1, "fwrite failed\n");
@@ -1117,7 +1117,10 @@ static void save_cpu_state(void)
 	if (fwrite(&mp_state, sizeof(mp_state), 1, f) != 1)
 		err(1, "fwrite failed\n");
 
-	comm_register_client(&sregs, &regs, &fpu, &msr_data, &lapic, &xsave, &xcrs, &events, &mp_state, "127.0.0.1", "register" , "NULL");
+	//&sregs, &regs, &fpu, &msr_data, &lapic, &xsave, &xcrs, &events, &mp_state
+	if 	(called_by_migration)
+		comm_register_client(&checkpoint_register, "127.0.0.1", "register" , "NULL");
+	
 
 	fclose(f);
 }
@@ -1372,17 +1375,52 @@ static void timer_handler(int signum)
 	if (stat("checkpoint", &st) == -1)
 		mkdir("checkpoint", 0700);
 
+	// update configuration file
+	FILE* f = fopen("checkpoint/chk_config.txt", "w");
+	if (f == NULL) {
+		err(1, "fopen: unable to open file");
+	}
+
+	fprintf(f, "number of cores: %u\n", ncores);
+	//printf("before chk_config\n");
+	fprintf(f, "memory size: 0x%zx\n", guest_size);
+	fprintf(f, "checkpoint number: %u\n", no_checkpoint);
+	fprintf(f, "entry point: 0x%zx\n", elf_entry);
+	if (full_checkpoint)
+		fprintf(f, "full checkpoint: 1");
+	else
+		fprintf(f, "full checkpoint: 0");
+
+	fclose(f);
+
+	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
+	{
+		comm_config_t checkpoint_config;
+		checkpoint_config.ncores=&ncores;
+		checkpoint_config.guest_size=&guest_size;
+		checkpoint_config.no_checkpoint=&no_checkpoint;
+		checkpoint_config.elf_entry=&elf_entry;
+		checkpoint_config.full_checkpoint=&full_checkpoint;
+		comm_config_client(&checkpoint_config,"127.0.0.1", "config", "NULL");
+	}
+	//printf("after chk_config file\n");
+
 	for(size_t i = 0; i < ncores; i++)
 		if (vcpu_threads[i] != pthread_self())
 			pthread_kill(vcpu_threads[i], SIGRTMIN);
 
 	pthread_barrier_wait(&barrier);
 
+	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
+		called_by_migration=true;
+
 	save_cpu_state();
+
+	called_by_migration=false;
 
 	snprintf(fname, MAX_FNAME, "checkpoint/chk%u_mem.dat", no_checkpoint);
 
-	FILE* f = fopen(fname, "w");
+	f = fopen(fname, "w");
 	if (f == NULL) {
 		err(1, "fopen: unable to open file");
 	}
@@ -1511,31 +1549,6 @@ nextslot:
 	fclose(f);
 
 	pthread_barrier_wait(&barrier);
-
-	// update configuration file
-	f = fopen("checkpoint/chk_config.txt", "w");
-	if (f == NULL) {
-		err(1, "fopen: unable to open file");
-	}
-
-	fprintf(f, "number of cores: %u\n", ncores);
-	fprintf(f, "memory size: 0x%zx\n", guest_size);
-	fprintf(f, "checkpoint number: %u\n", no_checkpoint);
-	fprintf(f, "entry point: 0x%zx\n", elf_entry);
-	if (full_checkpoint)
-		fprintf(f, "full checkpoint: 1");
-	else
-		fprintf(f, "full checkpoint: 0");
-
-	fclose(f);
-	comm_config_t struct_config;
-	struct_config.ncores=ncores;
-	struct_config.guest_size=guest_size;
-	struct_config.no_checkpoint=no_checkpoint;
-	struct_config.elf_entry;
-	struct_config.full_checkpoint;
-	comm_config_client(&struct_config, "127.0.0.1", "config", "NULL");
-
 
 	if (verbose) {
 		gettimeofday(&end, NULL);

@@ -59,20 +59,27 @@ typedef struct{
     char    data_position[1024]; /* Data/File Path */
 } comm_socket_header_t;
 
+/*
+typedef struct {
+	struct kvm_msrs *info;
+	struct kvm_msr_entry *entries[MAX_MSR_ENTRIES];
+} msr_data_t;
+*/
 typedef struct{
-	struct msr_data{
-		struct kvm_msrs info;
-		struct kvm_msr_entry entries[MAX_MSR_ENTRIES];
-	} msr_data;
-
-	struct kvm_regs regs;
-	struct kvm_sregs sregs;
-	struct kvm_fpu fpu;
-	struct kvm_lapic_state lapic;
-	struct kvm_xsave xsave;
-	struct kvm_xcrs xcrs;
-	struct kvm_vcpu_events events;
-	struct kvm_mp_state mp_state;
+	//msr_data_t mrs_data;
+	//struct kvm_msr_entry *msrs;
+	struct {
+	struct kvm_msrs *info;
+	struct kvm_msr_entry *entries[MAX_MSR_ENTRIES];
+	} *msr_data;
+	struct kvm_regs *regs;
+	struct kvm_sregs *sregs;
+	struct kvm_fpu *fpu;
+	struct kvm_lapic_state *lapic;
+	struct kvm_xsave *xsave;
+	struct kvm_xcrs *xcrs;
+	struct kvm_vcpu_events *events;
+	struct kvm_mp_state *mp_state;
 }comm_register_t;
 
 typedef struct{
@@ -86,10 +93,17 @@ typedef struct{
 int commserver(void);
 int commclient(char *path, char *position, char *server_ip);
 
+
+int comm_config_server(comm_register_t *checkpoint_config);
+int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *comm_type, char *comm_subtype);
+
+int comm_register_server(comm_register_t *recv_vcpu_register);
+int comm_register_client(comm_register_t *checkpoint_register, char *server_ip, char *comm_type, char *comm_subtype);
+
 int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_type, char *comm_subtype);
+int comm_clock_server(struct kvm_clock_data *clock);
+
 int comm_chunk_client(size_t *pgdpgt, size_t *mem_chuck, unsigned long masksize, char *server_ip, char *comm_type, char *comm_subtype);
-int comm_register_client(struct kvm_sregs *sregs, struct kvm_regs *regs, struct kvm_fpu *fpu, struct msr_data *msr_data, struct kvm_lapic_state *lapic,
-struct kvm_xsave *xsave, struct kvm_xcrs *xcrs, struct kvm_vcpu_events *events,struct kvm_mp_state *mp_state, char server_ip, char *comm_type, char *comm_subtype);
-int comm_config_client(comm_config_t *config_struct, char *server_ip, char *comm_type, char *comm_subtype);
+int comm_chunk_server(size_t *pgdpgt, size_t *mem_chunck, unsigned long *masksize);
 
 #endif
