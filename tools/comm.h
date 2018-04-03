@@ -50,7 +50,28 @@
 #include <linux/const.h>
 #include <linux/kvm.h>
 
+
+#define PORT 3490
+
 #define MAX_MSR_ENTRIES	25
+
+/// Page offset bits
+#define PAGE_BITS			12
+#define PAGE_2M_BITS	21
+#define PAGE_SIZE			(1L << PAGE_BITS)
+/// Mask the page address without page map flags and XD flag
+#if 0
+#define PAGE_MASK		((~0L) << PAGE_BITS)
+#define PAGE_2M_MASK		(~0L) << PAGE_2M_BITS)
+#else
+#define PAGE_MASK			(((~0UL) << PAGE_BITS) & ~PG_XD)
+#define PAGE_2M_MASK	(((~0UL) << PAGE_2M_BITS) & ~PG_XD)
+#endif
+
+#define PG_PSE			(1 << 7)
+
+/// Disable execution for this page
+#define PG_XD			(1L << 63)
 
 // struct for information size and data name
 typedef struct{
@@ -80,6 +101,8 @@ typedef struct{
 	struct kvm_xcrs *xcrs;
 	struct kvm_vcpu_events *events;
 	struct kvm_mp_state *mp_state;
+	//uint32_t *no_checkpoint;
+	//uint32_t *cpuid;
 }comm_register_t;
 
 typedef struct{
@@ -97,13 +120,13 @@ int commclient(char *path, char *position, char *server_ip);
 int comm_config_server(comm_register_t *checkpoint_config);
 int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *comm_type, char *comm_subtype);
 
-int comm_register_server(comm_register_t *recv_vcpu_register);
-int comm_register_client(comm_register_t *checkpoint_register, char *server_ip, char *comm_type, char *comm_subtype);
+int comm_register_server(comm_register_t *vcpu_register, uint32_t *cpuid, uint32_t *ncores);
+int comm_register_client(comm_register_t *vcpu_register, uint32_t *cpuid, uint32_t *ncores, char *server_ip, char *comm_type, char *comm_subtype);
 
-int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_type, char *comm_subtype);
 int comm_clock_server(struct kvm_clock_data *clock);
+int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_type, char *comm_subtype);
 
-int comm_chunk_client(size_t *pgdpgt, size_t *mem_chuck, unsigned long masksize, char *server_ip, char *comm_type, char *comm_subtype);
-int comm_chunk_server(size_t *pgdpgt, size_t *mem_chunck, unsigned long *masksize);
+int comm_chunk_server(uint8_t *mem);
+int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, unsigned long *masksize, char *server_ip, char *comm_type, char *comm_subtype);
 
 #endif

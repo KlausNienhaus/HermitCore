@@ -28,47 +28,7 @@
 
 #define _GNU_SOURCE
 
-#include <stdio.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <stddef.h>
-#include <arpa/inet.h>
-#include <string.h>
-#include <unistd.h>
-#include <errno.h>
-#include <signal.h>
-#include <time.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/time.h>
-#include <linux/const.h>
-#include <linux/kvm.h>
-
 #include "comm.h"
-
-#define PORT 3490
-
-#define MAX_MSR_ENTRIES	25
-
-/// Page offset bits
-#define PAGE_BITS			12
-#define PAGE_2M_BITS	21
-#define PAGE_SIZE			(1L << PAGE_BITS)
-/// Mask the page address without page map flags and XD flag
-#if 0
-#define PAGE_MASK		((~0L) << PAGE_BITS)
-#define PAGE_2M_MASK		(~0L) << PAGE_2M_BITS)
-#else
-#define PAGE_MASK			(((~0UL) << PAGE_BITS) & ~PG_XD)
-#define PAGE_2M_MASK	(((~0UL) << PAGE_2M_BITS) & ~PG_XD)
-#endif
-
-#define PG_PSE			(1 << 7)
-
-/// Disable execution for this page
-#define PG_XD			(1L << 63)
 
 static uint8_t* guest_mem = NULL;
 //size_t* pgt;
@@ -154,14 +114,14 @@ int commserver(void)
 
             int nrecv1 = 0;
             while (nrecv1<sizeof(size_t))
-                nrecv1 += recv(new_conn_fd, (void*)pgdpgt+nrecv1, sizeof(size_t)-nrecv1,0);
+                nrecv1 += recv(new_conn_fd, (void*)&pgdpgt+nrecv1, sizeof(size_t)-nrecv1,0);
             int nrecv2 = 0;
             while (nrecv2<sizeof(size_t))
-                nrecv2 += recv(new_conn_fd, (void*)mem_chunck+nrecv2, sizeof(size_t)-nrecv2,0);
+                nrecv2 += recv(new_conn_fd, (void*)&mem_chunck+nrecv2, sizeof(size_t)-nrecv2,0);
             int nrecv3 = 0;
             while (nrecv3<(sizeof(size_t)+sizeof(size_t)+sizeof(unsigned long)))
-                nrecv3 += recv(new_conn_fd, (void*)masksize+nrecv3, sizeof(unsigned long)-nrecv3,0);
-            if ((nrecv1+nrecv2+nrecv3)<(sizeof(pgdpgt)+sizeof(mem_chunck)+sizeof(masksize)))
+                nrecv3 += recv(new_conn_fd, (void*)&masksize+nrecv3, sizeof(uint)-nrecv3,0);
+            if ((nrecv1+nrecv2+nrecv3)<(sizeof(pgdpgt)+sizeof(mem_chunck)+sizeof(unsigned long)))
                 perror("Memory Chunk incomplete\n");
 
 /*
@@ -571,7 +531,7 @@ int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *
 }
 
 
-int comm_register_server(comm_register_t *recv_vcpu_register)
+int comm_register_server(comm_register_t *vcpu_register, uint32_t *cpuid, uint32_t *ncores)
 {
     int server_fd, new_conn_fd; //data_size;
     struct sockaddr_in address;
@@ -622,6 +582,7 @@ int comm_register_server(comm_register_t *recv_vcpu_register)
             exit(EXIT_FAILURE);
         }
         
+        meta_data.data_size=(sizeof(comm_register_t)*ncores);
         // recieving file metadata for positioning, name and size from client 
         recv(new_conn_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
         recv(new_conn_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
@@ -631,11 +592,11 @@ int comm_register_server(comm_register_t *recv_vcpu_register)
         if (meta_data.data_name=="register" && meta_data.data_position=="NULL")
         {
             int nrecv = 0;
-            while (nrecv<sizeof(recv_vcpu_register))
-                nrecv += recv(new_conn_fd, (void*)&recv_vcpu_register+nrecv, sizeof(recv_vcpu_register)-nrecv, 0);
-            if (nrecv<(sizeof(recv_vcpu_register)))
+            while (nrecv<(sizeof(vcpu_register)*ncores))
+                nrecv += recv(new_conn_fd, (void*)&vcpu_register+nrecv, (sizeof(vcpu_register)*ncores)-nrecv, 0);
+            if (nrecv<(sizeof(vcpu_register)))
                 perror("Register recieved incomplete\n");
-            else if (nrecv=sizeof(recv_vcpu_register))
+            else if (nrecv=(sizeof(vcpu_register)*ncores))
                 break;
         }
         
@@ -651,7 +612,7 @@ int comm_register_server(comm_register_t *recv_vcpu_register)
 
 //@brief:   Comm function for sending VCPU register for checkpoint transfer
 //          atm sends data file to server (e.g. checkpoint)
-int comm_register_client(comm_register_t *checkpoint_register, char *server_ip, char *comm_type, char *comm_subtype)
+int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32_t *ncores, char *server_ip, char *comm_type, char *comm_subtype)
 {
     struct sockaddr_in address;
     struct sockaddr_in serv_addr;
@@ -660,19 +621,6 @@ int comm_register_client(comm_register_t *checkpoint_register, char *server_ip, 
     char *serv_ip; // = "127.0.0.1";
     comm_socket_header_t meta_data;
     //char *comm_type = "register";
-    
-/*    comm_register_t tosend_vcpu_reg;
-//  tosend_vcpu_reg.msrs=tosend_vcpu_reg.msr_data.entries;
-    tosend_vcpu_reg.sregs=sregs;
-    tosend_vcpu_reg.regs=regs;
-    tosend_vcpu_reg.fpu=fpu;
-    tosend_vcpu_reg.msr_data=msr_data;
-    tosend_vcpu_reg.lapic=lapic;
-    tosend_vcpu_reg.xsave=xsave;
-    tosend_vcpu_reg.xcrs=xcrs;
-    tosend_vcpu_reg.events=events;
-    tosend_vcpu_reg.mp_state=mp_state; */
-
 
     if (server_ip)
         strcpy(serv_ip, server_ip);
@@ -710,7 +658,7 @@ int comm_register_client(comm_register_t *checkpoint_register, char *server_ip, 
     //path in this case codes the type of transfer comming
     strcpy(meta_data.data_name, comm_type);
     strcpy(meta_data.data_position, comm_subtype);
-    meta_data.data_size = (sizeof(checkpoint_register));
+    meta_data.data_size = (sizeof(vcpu_register)*ncores);
     int nsent = send(client_fd, (void*)meta_data.data_name, sizeof(buffer), 0);
     nsent += send(client_fd, (void*)meta_data.data_size, sizeof(uint), 0);
     nsent += send(client_fd, (void*)meta_data.data_position, sizeof(buffer), 0);
@@ -722,11 +670,11 @@ int comm_register_client(comm_register_t *checkpoint_register, char *server_ip, 
 
     //printf("Sending \n");
     nsent=0;
-    while(nsent<sizeof(checkpoint_register))
+    while(nsent<(sizeof(vcpu_register)*ncores))
     {
-        nsent += send(client_fd, (void*)&checkpoint_register+nsent, sizeof(checkpoint_register)-nsent, 0);
+        nsent += send(client_fd, (void*)&vcpu_register+nsent, (sizeof(vcpu_register)*ncores)-nsent, 0);
     }
-    if (nsent < (sizeof(checkpoint_register)))
+    if (nsent < (sizeof(vcpu_register)*ncores))
         {
             perror("Register not correct send \n");
             exit(EXIT_FAILURE);
@@ -893,18 +841,18 @@ int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_
 }
 
 //TODO: adding loop for all tables until all mem tables are recieved
+//size_t *pgdpgt, size_t *mem_chunck, unsigned long *masksize
 
-int comm_chunk_server(size_t *pgdpgt, size_t *mem_chunck, unsigned long *masksize)
+int comm_chunk_server(uint8_t *mem)
 {
-    int server_fd, new_conn_fd, valread; //data_size;
+    int server_fd, new_conn_fd; //data_size;
     struct sockaddr_in address;
     int opt = 1, filesrecv = 0, addrlen = sizeof(address);
     char buffer[1024]= {0};
-    //char *data_name,*data_position;
-    struct stat st = {0};
     size_t location;
+    unsigned long masksize;
+
     comm_socket_header_t meta_data = {0};
-    //comm_register_t recv_vcpu_register = {0};
 
 
     // creating socket file descriptor
@@ -940,7 +888,69 @@ int comm_chunk_server(size_t *pgdpgt, size_t *mem_chunck, unsigned long *masksiz
     }
     //printf("waiting on connection by listen \n");
 
-    /*
+    while(1)
+    {
+        if ((new_conn_fd = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0)
+        {
+            perror("accept failed\n");
+            exit(EXIT_FAILURE);
+        }
+        
+        // recieving file metadata for positioning, name and size from client 
+        recv(new_conn_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
+        recv(new_conn_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
+        recv(new_conn_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
+        printf("metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
+
+        //printf("Sending \n");
+        if (meta_data.data_name=="mem")
+        {         
+            int nrecv1=0;
+            while(nrecv1<sizeof(size_t))
+                nrecv1 += recv(new_conn_fd, (void*)&location+nrecv1, sizeof(size_t)-nrecv1, 0);
+            int nrecv2=0;
+            while(nrecv2<sizeof(unsigned long))
+                nrecv2 += recv(new_conn_fd, (void*)&masksize+nrecv2, sizeof(unsigned long)-nrecv2, 0);
+            int nrecv3=0;
+            if (meta_data.data_position=="PAGE_BITS")
+            {
+            while(nrecv3<(1UL << PAGE_BITS))
+                nrecv3 += recv(new_conn_fd, (void*)(size_t*)(mem + (location & PAGE_MASK))+nrecv3, (1UL << PAGE_BITS)-nrecv3, 0);
+            }
+            else if (meta_data.data_position=="PAGE_2M_BITS")
+            {
+            while(nrecv3<(1UL << PAGE_2M_BITS))
+                nrecv3 += recv(new_conn_fd, (void*)(size_t*)(mem + (location & PAGE_2M_MASK))+nrecv3, (1UL << PAGE_2M_BITS)-nrecv3, 0);
+            }
+            else if (meta_data.data_position=="PAGE_SIZE")
+            {
+            while(nrecv3<PAGE_SIZE)
+                nrecv3 += recv(new_conn_fd, (void*)(size_t*)(mem + location)+nrecv3, PAGE_SIZE-nrecv3, 0);
+            }
+            if (nrecv3==PAGE_SIZE)
+                printf("Page_Size recv");
+            else if (nrecv3==(1UL << PAGE_2M_BITS))
+                printf("(1UL << PAGE_2M_BITS) recv");
+            else if (nrecv3==(1UL << PAGE_BITS))
+                printf("(1UL << PAGE_BITS) recv");
+
+            if ((nrecv1+nrecv2+nrecv3) < (meta_data.data_size))
+            {
+                perror("Memory chunk not correct recieved \n");
+                //exit(EXIT_FAILURE);
+            }
+        } 
+        else if(meta_data.data_name=="mem" && meta_data.data_position=="finished")
+            break;
+        }
+          
+
+    printf("Memory for migration recieved\n");
+    close(server_fd);
+    return 0;
+}
+
+          /*
 (pgd+k,sizeof(size_t),(size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)),(1UL << PAGE_2M_BITS));
 (&pgt_entry,sizeof(size_t),(size_t*)(guest_mem + (pgt[l] & PAGE_MASK)),(1UL << PAGE_BITS));
 
@@ -966,42 +976,9 @@ if (masksize == (1UL << PAGE_2M_BITS))
 
 */
 
-    while(1)
-    {
-        if ((new_conn_fd = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0)
-        {
-            perror("accept failed\n");
-            exit(EXIT_FAILURE);
-        }
-        
-        // recieving file metadata for positioning, name and size from client 
-        recv(new_conn_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
-        recv(new_conn_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
-        recv(new_conn_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
-        printf("metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
-
-        //"Pageaddr" "NULL
-        if (meta_data.data_name=="mem" && meta_data.data_position=="NULL")
-        {
-            int nrecv = 0;
-            while (nrecv<sizeof(clock))
-                nrecv += recv(new_conn_fd, (void*)&clock+nrecv, sizeof(clock)-nrecv, 0);
-            if (nrecv<(sizeof(clock)))
-                perror("Memory recieved incomplete\n");
-            else if (nrecv=sizeof(clock))
-                break;
-        }
-        
-    }
-
-    printf("Memory for migration recieved\n");
-    close(server_fd);
-    return 0;
-}
-
 //@brief:   Client side C function for TCP Socket Connections sending Memory Chunk
 //          atm sends pgd or pgt with corresponding memory to server (e.g. checkpoint)
-int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, unsigned long masksize, char *server_ip, char *comm_type, char *comm_subtype)
+int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, unsigned long *masksize, char *server_ip, char *comm_type, char *comm_subtype)
 {
     struct sockaddr_in address;
     struct sockaddr_in serv_addr;
@@ -1009,9 +986,7 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, unsigned long masksize
     char buffer[1024] = {0};
     char *serv_ip; // = "127.0.0.1";
     comm_socket_header_t meta_data;
-    // char *data_name, *data_position;
-    //char name_arg[1024];
-    //struct stat st = {0};
+
      
     if (server_ip)
         strcpy(serv_ip, server_ip);
@@ -1022,7 +997,6 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, unsigned long masksize
     }
     //printf("start comm client \n");
     
-    //printf("data_name_arg %s", argv[0]);
     
     // starting socket in IPv4 mode as AF_INET indicates
     if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
@@ -1051,7 +1025,7 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, unsigned long masksize
     //data_name and data_position in this case codes the type of transfer comming for comm_server
     strcpy(meta_data.data_name, comm_type);
     strcpy(meta_data.data_position, comm_subtype);
-    meta_data.data_size = (sizeof(pgdpgt)+sizeof(mem_chunck)+sizeof(masksize));
+    meta_data.data_size = (sizeof(size_t)+sizeof(unsigned long)+(masksize));
     int nsent = send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
     nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
     nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
@@ -1061,22 +1035,40 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, unsigned long masksize
             exit(EXIT_FAILURE);
         } 
 
+    if(meta_data.data_name=="mem")
+    {
     //printf("Sending \n");
     int nsent1=0;
-    while(nsent<sizeof(pgdpgt))
-        nsent += send(client_fd, (void*)pgdpgt+nsent1, sizeof(size_t)-nsent1, 0);
-    int nsent2=0;
-    while(nsent2<(sizeof(pgdpgt)+sizeof(mem_chunck)))
-        nsent2 += send(client_fd, (void*)mem_chunck+nsent2, sizeof(size_t)-nsent2, 0);
-    int nsent3=0;
-    while(nsent3<(sizeof(pgdpgt)+sizeof(mem_chunck)+sizeof(masksize)))    
-        nsent3 += send(client_fd, (void*)masksize+nsent3, sizeof(unsigned long)-nsent3, 0);
-    if ((nsent1+nsent2+nsent3) < (sizeof(pgdpgt)+sizeof(mem_chunck)+sizeof(masksize)))
+        while(nsent1<sizeof(size_t))
+            nsent1 += send(client_fd, (void*)&pgdpgt+nsent1, sizeof(size_t)-nsent1, 0);
+        int nsent2=0;
+        while(nsent2<(sizeof(unsigned long)))    
+            nsent2 += send(client_fd, (void*)&masksize+nsent2, sizeof(unsigned long)-nsent2, 0);
+        int nsent3=0;
+        if (meta_data.data_position=="PAGE_BITS")
         {
-            perror("Memory not correct send not correct send \n");
-            exit(EXIT_FAILURE);
-        } 
-   
+        while(nsent3<(1UL << PAGE_BITS))
+            nsent3 += send(client_fd, (void*)&mem_chunck+nsent3, (1UL << PAGE_BITS)-nsent3, 0);
+        }
+        else if (meta_data.data_position=="PAGE_2M_BITS")
+        {
+        while(nsent3<(1UL << PAGE_2M_BITS))
+            nsent3 += send(client_fd, (void*)&mem_chunck+nsent3, (1UL << PAGE_2M_BITS)-nsent3, 0);
+        }
+        else if (meta_data.data_position=="PAGE_SIZE")
+        {
+        while(nsent3<PAGE_SIZE)
+            nsent3 += send(client_fd, (void*)&mem_chunck+nsent3, PAGE_SIZE-nsent3, 0);
+        }
+        
+
+        if ((nsent1+nsent2+nsent3) < meta_data.data_size)
+            {
+                perror("Memory not correct send not correct send \n");
+                exit(EXIT_FAILURE);
+            }
+    }
+     
     close(client_fd);
     return 0;
 }

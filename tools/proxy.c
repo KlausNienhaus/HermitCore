@@ -80,6 +80,9 @@ static char pidname[] = "/tmp/hpid-XXXXXX";
 static char tmpname[] = "/tmp/hermit-XXXXXX";
 static char cmdline[MAX_PATH] = "";
 
+static char *hermit_check; // = getenv("HERMIT_CHECKPOINT");
+static char *comm_mode; // = getenv("PROXY_COMM");
+
 extern char **environ;
 
 static void stop_hermit(void);
@@ -1046,10 +1049,10 @@ int main(int argc, char **argv)
 	int ret;
 	int comm_server_ret;
 	int comm_client_ret;
-	char* comm_mode; 
-	
 
+	hermit_check = getenv("HERMIT_CHECKPOINT");
 	comm_mode = getenv("PROXY_COMM");
+
 	printf("PROXY_COMM is set to: %s\n",comm_mode);
 	if (comm_mode)
 	{
