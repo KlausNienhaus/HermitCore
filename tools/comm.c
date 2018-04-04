@@ -30,24 +30,22 @@
 
 #include "comm.h"
 
-static uint8_t* guest_mem = NULL;
+//static uint8_t *guest_mem = NULL;
 //size_t* pgt;
 
 //@brief:   Server side C function for TCP Socket Connections 
 //          atm recieves data file from client (e.g. checkpoint)
 int commserver(void)
 {
-    int server_fd, new_conn_fd, valread; //data_size;
+    int server_fd, new_conn_fd; //data_size;
     struct sockaddr_in address;
     int opt = 1, filesrecv = 0, addrlen = sizeof(address);
     char buffer[1024]= {0};
-    //char *data_name,*data_position;
     struct stat st = {0};
     size_t location;
 	int ret;
     comm_socket_header_t meta_data = {0};
-    comm_register_t recv_vcpu_register = {0};
-    comm_config_t recv_config_register = {0};
+
 
 
     // creating socket file descriptor
@@ -86,8 +84,7 @@ int commserver(void)
 
     while(1)
     {
-        if ((new_conn_fd = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0)
-        {
+        if ((new_conn_fd = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0){
             perror("accept failed\n");
             exit(EXIT_FAILURE);
         }
@@ -98,84 +95,7 @@ int commserver(void)
         recv(new_conn_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
         printf("metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
 
-
-        if (meta_data.data_name=="memory" && meta_data.data_position=="clock")
-        {
-            struct kvm_clock_data clock = {};
-            uint clocksize=sizeof(clock); 
-            int nrecv = 0;
-            while (nrecv<meta_data.data_size)
-                nrecv += recv(new_conn_fd, (void*)&clock+nrecv, sizeof(clock)-nrecv,0);
-        }
-        else if (meta_data.data_name=="memory" && meta_data.data_position=="NULL")
-        {
-            size_t pgdpgt, mem_chunck;
-            uint masksize;
-
-            int nrecv1 = 0;
-            while (nrecv1<sizeof(size_t))
-                nrecv1 += recv(new_conn_fd, (void*)&pgdpgt+nrecv1, sizeof(size_t)-nrecv1,0);
-            int nrecv2 = 0;
-            while (nrecv2<sizeof(size_t))
-                nrecv2 += recv(new_conn_fd, (void*)&mem_chunck+nrecv2, sizeof(size_t)-nrecv2,0);
-            int nrecv3 = 0;
-            while (nrecv3<(sizeof(size_t)+sizeof(size_t)+sizeof(unsigned long)))
-                nrecv3 += recv(new_conn_fd, (void*)&masksize+nrecv3, sizeof(uint)-nrecv3,0);
-            if ((nrecv1+nrecv2+nrecv3)<(sizeof(pgdpgt)+sizeof(mem_chunck)+sizeof(unsigned long)))
-                perror("Memory Chunk incomplete\n");
-
-/*
-        size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
-        The function fread() reads nmemb items of data, each size bytes long, from the stream pointed to by stream, storing them at the location given by ptr.
-
-        ssize_t recv(int sockfd, void *buf, size_t len, int flags);
-  
-       
-(pgd+k,sizeof(size_t),(size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)),(1UL << PAGE_2M_BITS));
-(&pgt_entry,sizeof(size_t),(size_t*)(guest_mem + (pgt[l] & PAGE_MASK)),(1UL << PAGE_BITS));
-
-        while (fread(&location, sizeof(location), 1, f) == 1) {
-			//printf("location 0x%zx\n", location);
-			if (location & PG_PSE)
-				ret = fread((size_t*) (mem + (location & PAGE_2M_MASK)), (1UL << PAGE_2M_BITS), 1, f);
-			else
-				ret = fread((size_t*) (mem + (location & PAGE_MASK)), (1UL << PAGE_BITS), 1, f);
-
-			if (ret != 1) {
-				fprintf(stderr, "Unable to read checkpoint: ret = %d", ret);
-				err(1, "fread failed");
-			}
-
-if (masksize == (1UL << PAGE_2M_BITS))
-
-
-    strcpy(meta_data.data_name, path); //"checkpoint/Abrechnung.xlsm" "checkpoint/chk_config.txt"
-    strcpy(meta_data.data_position, position);
-    if (stat(meta_data.data_position, &st) == -1)
-		mkdir(meta_data.data_position, 0700);
-
-*/  
-
-        }
-        else if (meta_data.data_name=="register" && meta_data.data_position=="NULL")
-        {
-            int nrecv = 0;
-            while (nrecv<sizeof(recv_vcpu_register))
-                nrecv += recv(new_conn_fd, (void*)&recv_vcpu_register+nrecv, sizeof(recv_vcpu_register)-nrecv, 0);
-            if (nrecv<(sizeof(recv_vcpu_register)))
-                perror("Register recieved incomplete\n");
-        }
-        else if (meta_data.data_name=="config" && meta_data.data_position=="NULL")
-        {
-            int nrecv = 0;
-            while (nrecv<sizeof(recv_config_register))
-                nrecv += recv(new_conn_fd, (void*)&recv_config_register+nrecv, sizeof(recv_config_register)-nrecv, 0);
-            if (nrecv<(sizeof(recv_config_register)))
-                perror("Config recieved incomplete\n");
-        }
-        else
-        {
-        // hardcoded for testing purposes atm
+    
         //strcpy(meta_data.data_name, "checkpoint/chk_config_copy.txt"); //"checkpoint/testcopy_Abrechnung.xlsm"
         if (stat(meta_data.data_position, &st) == -1)
 		mkdir(meta_data.data_position, 0700);
@@ -197,50 +117,38 @@ if (masksize == (1UL << PAGE_2M_BITS))
             int valrecv = recv(new_conn_fd , buffer, sizeof(buffer), 0);
             //printf("Bytes recieved %d \n", valrecv);        
             // if recv was success, write data to file.
-            if(valrecv > 0)
-            {
+            if(valrecv > 0){
                 //printf("Writing buffer to file \n");
                 recv_writen += fwrite(buffer, sizeof(char), valrecv, fp);
             }
 
             
             // checking if everything was recieved or something is missing and an error occured 
-            if (valrecv < sizeof(buffer))
-            {
+            if (valrecv < sizeof(buffer)){
                 fseek(fp, 0, SEEK_END); // seek to end of file
                 int recieved_fsize = ftell(fp);   // get current file pointer
                 printf("recieveddata: %d , %d, metafilesize: %d to filename: %s \n" , (recv_writen*sizeof(char)), recieved_fsize, meta_data.data_size, meta_data.data_name);
-                if (recieved_fsize == meta_data.data_size)
-                {
+                if (recieved_fsize == meta_data.data_size){
                     printf("finished transfer\n");
                     fflush(fp);
                     fclose(fp);
                     filesrecv++;
                     printf("files: %d \n",filesrecv);
-                    
-                    /*
-                    char *msg = "file recieved";
-                    if (send(new_socket, (void*)&msg, sizeof(buffer), 0)>0)
-                    {
-                        printf("send: %s", msg);
-                    }*/
+
                 }
-                if (ferror(fp))
-                {
+                if (ferror(fp)){
                     printf("Error reading from socket\n");
                     perror("Reading buffer error");  
-                }
-                
+                } 
                 break;
             }
         }
-        }
+        
 
         printf("finished file transfer closing socket and waiting for new connection\n");
         close(new_conn_fd);
         sleep(1);
-        if (filesrecv>=3) 
-        {
+        if (filesrecv>=3) {
             printf("recieved all checkpoint files starting up system\n");
             break;
         }
@@ -250,26 +158,18 @@ if (masksize == (1UL << PAGE_2M_BITS))
     return 0;
 }
 
+
 //@brief:   Client side C function for TCP Socket Connections 
 //          atm sends data file to server (e.g. checkpoint)
 int commclient(char *path, char *position, char *server_ip)
 {
     struct sockaddr_in address;
     struct sockaddr_in serv_addr;
-    int client_fd = 0, valread; //data_size;
+    int client_fd = 0; //data_size;
     char buffer[1024] = {0};
-    char *serv_ip; // = "127.0.0.1";
     comm_socket_header_t meta_data;
 
     struct stat st = {0};
-
-    if (server_ip)
-        strcpy(serv_ip, server_ip);
-    else
-    {
-        printf("Invalid address/ Address not supported, falling back to loop adr \n");
-        strcpy(serv_ip, "127.0.0.1");
-    }
     //printf("start comm client \n");
 
     
@@ -285,7 +185,7 @@ int commclient(char *path, char *position, char *server_ip)
     serv_addr.sin_port = htons(PORT);
       
     // Convert IPv4 (and IPv6) addresses from text to binary form
-    if(inet_pton(AF_INET, serv_ip, &serv_addr.sin_addr)<=0) 
+    if(inet_pton(AF_INET, server_ip, &serv_addr.sin_addr)<=0) 
     {
         printf("Invalid address/ Address not supported \n");
         exit(EXIT_FAILURE);
@@ -330,7 +230,6 @@ int commclient(char *path, char *position, char *server_ip)
     // read data from file and send it
     while(1)
     {
-         
         // reading file in chunks of buffer bytes
         int nread = fread(buffer,sizeof(char),sizeof(buffer),fp);
         //printf("Bytes read %d \n", nread);        
@@ -341,8 +240,7 @@ int commclient(char *path, char *position, char *server_ip)
             //printf("Sending \n");
             send(client_fd, buffer, nread, 0);
         }
-
-        
+      
         // checking if end of file was reached or error occured     
         if (nread < sizeof(buffer))
         {
@@ -361,21 +259,6 @@ int commclient(char *path, char *position, char *server_ip)
 
     }
 
-    /*
-    char msg[1024]; 
-    while(1)
-    {
-        if (recv(sock, (void*)&msg, sizeof(buffer), 0)>0)
-        {    
-            printf("%s",msg);
-            if (strncmp(msg,"file recieved", 14)==0)
-            {
-                printf("Server did validate: %s",msg);
-                break;
-            }
-        }
-    }*/
-    
     close(client_fd);
     return 0;
 }
@@ -440,11 +323,11 @@ int comm_config_server(comm_register_t *checkpoint_config)
         if (meta_data.data_name=="config" && meta_data.data_position=="NULL")
         {
             int nrecv = 0;
-            while (nrecv<sizeof(checkpoint_config))
-                nrecv += recv(new_conn_fd, (void*)&checkpoint_config+nrecv, sizeof(checkpoint_config)-nrecv, 0);
-            if (nrecv<(sizeof(checkpoint_config)))
+            while (nrecv<sizeof(meta_data.data_size))
+                nrecv += recv(new_conn_fd, (void*)&checkpoint_config+nrecv, sizeof(meta_data.data_size)-nrecv, 0);
+            if (nrecv<(sizeof(meta_data.data_size)))
                 perror("Register recieved incomplete\n");
-            else if (nrecv=sizeof(checkpoint_config))
+            else if (nrecv=sizeof(meta_data.data_size))
                 break;
         }
         else printf("wrong meta_data %s in config recieved\n", meta_data.data_name);
@@ -463,20 +346,12 @@ int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *
 {
     struct sockaddr_in address;
     struct sockaddr_in serv_addr;
-    int client_fd = 0, valread; //data_size;
+    int client_fd = 0; //data_size;
     char buffer[1024] = {0};
-    char *serv_ip; // = "127.0.0.1";
     comm_socket_header_t meta_data;
     comm_type = "config";
      
-    if (server_ip)
-        strcpy(serv_ip, server_ip);
-    else
-    {
-        printf("Invalid address/ Address not supported, falling back to loop adr \n");
-        strcpy(serv_ip, "127.0.0.1");
-    }
-        
+    
     // starting socket in IPv4 mode as AF_INET indicates
     if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
@@ -582,7 +457,7 @@ int comm_register_server(comm_register_t *vcpu_register, uint32_t *cpuid, uint32
             exit(EXIT_FAILURE);
         }
         
-        meta_data.data_size=(sizeof(comm_register_t)*ncores);
+        meta_data.data_size=(sizeof(vcpu_register));
         // recieving file metadata for positioning, name and size from client 
         recv(new_conn_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
         recv(new_conn_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
@@ -592,11 +467,11 @@ int comm_register_server(comm_register_t *vcpu_register, uint32_t *cpuid, uint32
         if (meta_data.data_name=="register" && meta_data.data_position=="NULL")
         {
             int nrecv = 0;
-            while (nrecv<(sizeof(vcpu_register)*ncores))
-                nrecv += recv(new_conn_fd, (void*)&vcpu_register+nrecv, (sizeof(vcpu_register)*ncores)-nrecv, 0);
-            if (nrecv<(sizeof(vcpu_register)))
+            while (nrecv<sizeof(meta_data.data_size))
+                nrecv += recv(new_conn_fd, (void*)&vcpu_register+nrecv, (sizeof(meta_data.data_size))-nrecv, 0);
+            if (nrecv<(sizeof(meta_data.data_size)))
                 perror("Register recieved incomplete\n");
-            else if (nrecv=(sizeof(vcpu_register)*ncores))
+            else if (nrecv=(sizeof(meta_data.data_size)))
                 break;
         }
         
@@ -616,19 +491,11 @@ int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32
 {
     struct sockaddr_in address;
     struct sockaddr_in serv_addr;
-    int client_fd = 0, valread; //data_size;
+    int client_fd = 0; //data_size;
     char buffer[1024] = {0};
-    char *serv_ip; // = "127.0.0.1";
     comm_socket_header_t meta_data;
     //char *comm_type = "register";
 
-    if (server_ip)
-        strcpy(serv_ip, server_ip);
-    else
-    {
-        printf("Invalid address/ Address not supported, falling back to loop adr \n");
-        strcpy(serv_ip, "127.0.0.1");
-    }
     
     // starting socket in IPv4 mode as AF_INET indicates
     if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
@@ -658,10 +525,10 @@ int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32
     //path in this case codes the type of transfer comming
     strcpy(meta_data.data_name, comm_type);
     strcpy(meta_data.data_position, comm_subtype);
-    meta_data.data_size = (sizeof(vcpu_register)*ncores);
-    int nsent = send(client_fd, (void*)meta_data.data_name, sizeof(buffer), 0);
-    nsent += send(client_fd, (void*)meta_data.data_size, sizeof(uint), 0);
-    nsent += send(client_fd, (void*)meta_data.data_position, sizeof(buffer), 0);
+    meta_data.data_size = (sizeof(vcpu_register));
+    int nsent = send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
+    nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
+    nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
     if (nsent < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
         {
             perror("Meta_data not correct send \n");
@@ -670,11 +537,11 @@ int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32
 
     //printf("Sending \n");
     nsent=0;
-    while(nsent<(sizeof(vcpu_register)*ncores))
+    while(nsent<(sizeof(vcpu_register)))
     {
-        nsent += send(client_fd, (void*)&vcpu_register+nsent, (sizeof(vcpu_register)*ncores)-nsent, 0);
+        nsent += send(client_fd, (void*)&vcpu_register+nsent, (sizeof(vcpu_register))-nsent, 0);
     }
-    if (nsent < (sizeof(vcpu_register)*ncores))
+    if (nsent < (sizeof(vcpu_register)))
         {
             perror("Register not correct send \n");
             exit(EXIT_FAILURE);
@@ -688,12 +555,11 @@ int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32
 
 int comm_clock_server(struct kvm_clock_data *clock)
 {
-    int server_fd, new_conn_fd, valread; //data_size;
+    int server_fd, new_conn_fd; //data_size;
     struct sockaddr_in address;
     int opt = 1, filesrecv = 0, addrlen = sizeof(address);
     char buffer[1024]= {0};
     comm_socket_header_t meta_data = {0};
-    //char *data_name,*data_position;
 
     // creating socket file descriptor
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
@@ -767,25 +633,11 @@ int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_
 {
     struct sockaddr_in address;
     struct sockaddr_in serv_addr;
-    int client_fd = 0, valread; //data_size;
+    int client_fd = 0; //data_size;
     char buffer[1024] = {0};
-    char *serv_ip; // = "127.0.0.1";
     comm_socket_header_t meta_data;
-    // char *data_name, *data_position;
-    //char name_arg[1024];
-    //struct stat st = {0};
-    comm_type="clock";
-     
-    if (server_ip)
-        strcpy(serv_ip, server_ip);
-    else
-    {
-        printf("Invalid address/ Address not supported, falling back to loop adr \n");
-        strcpy(serv_ip, "127.0.0.1");
-    }
-    //printf("start comm client \n");
     
-    //printf("data_name_arg %s", argv[0]);
+    //printf("start comm client \n"); 
     
     // starting socket in IPv4 mode as AF_INET indicates
     if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
@@ -898,7 +750,7 @@ int comm_chunk_server(uint8_t *mem)
         
         // recieving file metadata for positioning, name and size from client 
         recv(new_conn_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
-        recv(new_conn_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
+        recv(new_conn_fd, (void*)&meta_data.data_size, sizeof(unsigned long), 0);
         recv(new_conn_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
         printf("metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
 
@@ -982,19 +834,12 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, unsigned long *masksiz
 {
     struct sockaddr_in address;
     struct sockaddr_in serv_addr;
-    int client_fd = 0, valread; //data_size;
+    int client_fd = 0; //data_size;
     char buffer[1024] = {0};
-    char *serv_ip; // = "127.0.0.1";
+
     comm_socket_header_t meta_data;
 
-     
-    if (server_ip)
-        strcpy(serv_ip, server_ip);
-    else
-    {
-        printf("Invalid address/ Address not supported, falling back to loop adr \n");
-        strcpy(serv_ip, "127.0.0.1");
-    }
+
     //printf("start comm client \n");
     
     
@@ -1004,7 +849,8 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, unsigned long *masksiz
         printf("Socket creation error \n");
         exit(EXIT_FAILURE);
     }
-  
+    
+
     memset(&serv_addr, '0', sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(PORT);
@@ -1025,9 +871,14 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, unsigned long *masksiz
     //data_name and data_position in this case codes the type of transfer comming for comm_server
     strcpy(meta_data.data_name, comm_type);
     strcpy(meta_data.data_position, comm_subtype);
-    meta_data.data_size = (sizeof(size_t)+sizeof(unsigned long)+(masksize));
+    if (meta_data.data_position=="PAGE_BITS")
+        meta_data.data_size = (sizeof(size_t)+sizeof(unsigned long)+(1UL << PAGE_BITS));
+    else if (meta_data.data_position=="PAGE_2M_BITS")
+        meta_data.data_size = (sizeof(size_t)+sizeof(unsigned long)+(1UL << PAGE_2M_BITS));
+    else if (meta_data.data_position=="PAGE_SIZE")
+        meta_data.data_size = (sizeof(size_t)+sizeof(unsigned long)+PAGE_SIZE);
     int nsent = send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
-    nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
+    nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(unsigned long), 0);
     nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
     if (nsent < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
         {

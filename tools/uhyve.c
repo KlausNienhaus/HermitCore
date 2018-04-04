@@ -1003,16 +1003,16 @@ static int vcpu_init(void)
 
 		if 	((hermit_check>0)&&(strncmp(comm_mode, "server", 6)==0))
 		{			
-		//	comm_vcpu_register.msrs=comm_vcpu_register.msr_data.entries;
-			sregs=*comm_vcpu_register[cpuid].sregs;
-			regs=*comm_vcpu_register[cpuid].regs;
-			fpu=*comm_vcpu_register[cpuid].fpu;
-			msr_data=*comm_vcpu_register[cpuid].msr_data;
-			lapic=*comm_vcpu_register[cpuid].lapic;
-			xsave=*comm_vcpu_register[cpuid].xsave;
-			xcrs=*comm_vcpu_register[cpuid].xcrs;
-			events=*comm_vcpu_register[cpuid].events;
-			mp_state=*comm_vcpu_register[cpuid].mp_state;
+			//msrs=comm_vcpu_register[cpuid].msr_data.entries;
+			sregs=comm_vcpu_register[cpuid].sregs;
+			regs=comm_vcpu_register[cpuid].regs;
+			fpu=comm_vcpu_register[cpuid].fpu;
+			msr_data=comm_vcpu_register[cpuid].msr_data;
+			lapic=comm_vcpu_register[cpuid].lapic;
+			xsave=comm_vcpu_register[cpuid].xsave;
+			xcrs=comm_vcpu_register[cpuid].xcrs;
+			events=comm_vcpu_register[cpuid].events;
+			mp_state=comm_vcpu_register[cpuid].mp_state;
 		}
 
 		kvm_ioctl(vcpufd, KVM_SET_SREGS, &sregs);
@@ -1130,16 +1130,16 @@ static void save_cpu_state(void)
 	//&sregs, &regs, &fpu, &msr_data, &lapic, &xsave, &xcrs, &events, &mp_state
 	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
 	{
-	//	comm_vcpu_register.msrs=comm_vcpu_register.msr_data.entries;
-		comm_vcpu_register[cpuid].sregs=&sregs;
-		comm_vcpu_register[cpuid].regs=&regs;
-		comm_vcpu_register[cpuid].fpu=&fpu;
-		comm_vcpu_register[cpuid].msr_data=&msr_data;
-		comm_vcpu_register[cpuid].lapic=&lapic;
-		comm_vcpu_register[cpuid].xsave=&xsave;
-		comm_vcpu_register[cpuid].xcrs=&xcrs;
-		comm_vcpu_register[cpuid].events=&events;
-		comm_vcpu_register[cpuid].mp_state=&mp_state;
+		//comm_vcpu_register[cpuid].msrs=comm_vcpu_register[cpuid].msr_data.entries;
+		comm_vcpu_register[cpuid].sregs=sregs;
+		comm_vcpu_register[cpuid].regs=regs;
+		comm_vcpu_register[cpuid].fpu=fpu;
+		comm_vcpu_register[cpuid].msr_data=msr_data;
+		comm_vcpu_register[cpuid].lapic=lapic;
+		comm_vcpu_register[cpuid].xsave=xsave;
+		comm_vcpu_register[cpuid].xcrs=xcrs;
+		comm_vcpu_register[cpuid].events=events;
+		comm_vcpu_register[cpuid].mp_state=mp_state;
 	}
 
 	fclose(f);
@@ -1208,11 +1208,11 @@ int uhyve_init(char *path)
 		elf_entry=config_struct.elf_entry;
 		full_checkpoint=config_struct.full_checkpoint;
 		if (comm_vcpu_register==NULL)
-			comm_vcpu_register=calloc(1,sizeof(comm_register_t)*ncores);
-		else if (sizeof(comm_vcpu_register)!=sizeof(comm_register_t)*ncores)
+			comm_vcpu_register=calloc(ncores,sizeof(comm_register_t));
+		else if (sizeof(comm_vcpu_register)!=sizeof(comm_register_t))
 		{
 			free(comm_vcpu_register);
-			comm_vcpu_register=calloc(1,sizeof(comm_register_t)*ncores);
+			comm_vcpu_register=calloc(ncores,sizeof(comm_register_t));
 		}
 		comm_register_server(&comm_vcpu_register, &cpuid, &ncores);
 	}
@@ -1443,11 +1443,11 @@ static void timer_handler(int signum)
 		checkpoint_config.full_checkpoint=&full_checkpoint;
 		comm_config_client(&checkpoint_config, comm_new_host, "config", "NULL");
 		if (comm_vcpu_register==NULL)
-			comm_vcpu_register=calloc(1,sizeof(comm_register_t)*ncores);
+			comm_vcpu_register=calloc(ncores,sizeof(comm_register_t));
 		else if (sizeof(comm_vcpu_register)!=sizeof(comm_register_t)*ncores)
 		{
 			free(comm_vcpu_register);
-			comm_vcpu_register=calloc(1,sizeof(comm_register_t)*ncores);
+			comm_vcpu_register=calloc(ncores,sizeof(comm_register_t));
 		}
 	}
 	//printf("after chk_config file\n");

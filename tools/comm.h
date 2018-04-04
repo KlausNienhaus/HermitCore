@@ -57,7 +57,7 @@
 
 /// Page offset bits
 #define PAGE_BITS			12
-#define PAGE_2M_BITS	21
+#define PAGE_2M_BITS		21
 #define PAGE_SIZE			(1L << PAGE_BITS)
 /// Mask the page address without page map flags and XD flag
 #if 0
@@ -74,43 +74,39 @@
 #define PG_XD			(1L << 63)
 
 // struct for information size and data name
-typedef struct{
+typedef struct comm_socket_header{
 	uint	data_size;	/* Data Size  */
 	char	data_name[1024];	/* File Name   */
     char    data_position[1024]; /* Data/File Path */
 } comm_socket_header_t;
 
-/*
-typedef struct {
-	struct kvm_msrs *info;
-	struct kvm_msr_entry *entries[MAX_MSR_ENTRIES];
-} msr_data_t;
-*/
-typedef struct{
+
+struct msr_data{
+	struct kvm_msrs info;
+	struct kvm_msr_entry entries[MAX_MSR_ENTRIES];
+};
+typedef struct comm_register{
 	//msr_data_t mrs_data;
 	//struct kvm_msr_entry *msrs;
-	struct {
-	struct kvm_msrs *info;
-	struct kvm_msr_entry *entries[MAX_MSR_ENTRIES];
-	} *msr_data;
-	struct kvm_regs *regs;
-	struct kvm_sregs *sregs;
-	struct kvm_fpu *fpu;
-	struct kvm_lapic_state *lapic;
-	struct kvm_xsave *xsave;
-	struct kvm_xcrs *xcrs;
-	struct kvm_vcpu_events *events;
-	struct kvm_mp_state *mp_state;
-	//uint32_t *no_checkpoint;
-	//uint32_t *cpuid;
+	struct mrs_data msr_data;
+	struct kvm_regs regs;
+	struct kvm_sregs sregs;
+	struct kvm_fpu fpu;
+	struct kvm_lapic_state lapic;
+	struct kvm_xsave xsave;
+	struct kvm_xcrs xcrs;
+	struct kvm_vcpu_events events;
+	struct kvm_mp_state mp_state;
+	//uint32_t no_checkpoint;
+	//uint32_t cpuid;
 }comm_register_t;
 
-typedef struct{
-	uint32_t 	*ncores; 
-	size_t		*guest_size; 
-	uint32_t 	*no_checkpoint; 
-	uint64_t 	*elf_entry; 
-	bool 		*full_checkpoint;
+typedef struct comm_config{
+	uint32_t 	ncores; 
+	size_t		guest_size; 
+	uint32_t 	no_checkpoint; 
+	uint64_t 	elf_entry; 
+	bool 		full_checkpoint;
 }comm_config_t;
 
 int commserver(void);
