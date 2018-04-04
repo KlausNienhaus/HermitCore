@@ -1334,7 +1334,7 @@ int uhyve_init(char *path)
 		// for example tun/tap device or uhyvetap device
 		netfd = uhyve_net_init(netif_str);
 		if (netfd < 0)
-			err(1, "unable to initialized network");
+			err(1, "unable to initialized network\n");
 	}
 
 	return ret;
@@ -1352,8 +1352,31 @@ static void timer_handler(int signum)
 	if (verbose)
 		gettimeofday(&begin, NULL);
 
+	//printf("before checkpoint folder\n");
+
 	if (stat("checkpoint", &st) == -1)
 		mkdir("checkpoint", 0700);
+	
+	//printf("before chk_config\n");
+
+	// update configuration file
+	FILE* f = fopen("checkpoint/chk_config.txt", "w");
+	if (f == NULL) {
+		err(1, "fopen: unable to open file");
+	}
+
+	fprintf(f, "number of cores: %u\n", ncores);
+	fprintf(f, "memory size: 0x%zx\n", guest_size);
+	fprintf(f, "checkpoint number: %u\n", no_checkpoint);
+	fprintf(f, "entry point: 0x%zx\n", elf_entry);
+	if (full_checkpoint)
+		fprintf(f, "full checkpoint: 1");
+	else
+		fprintf(f, "full checkpoint: 0");
+
+	fclose(f);
+
+	//printf("after chk_config file\n");
 
 	for(size_t i = 0; i < ncores; i++)
 		if (vcpu_threads[i] != pthread_self())
@@ -1361,14 +1384,13 @@ static void timer_handler(int signum)
 
 	pthread_barrier_wait(&barrier);
 
-
 	save_cpu_state();
 
 	snprintf(fname, MAX_FNAME, "checkpoint/chk%u_mem.dat", no_checkpoint);
 
-	FILE* f = fopen(fname, "w");
+	f = fopen(fname, "w");
 	if (f == NULL) {
-		err(1, "fopen: unable to open file");
+		err(1, "fopen: unable to open file\n");
 	}
 
 	/*struct kvm_irqchip irqchip = {};
@@ -1382,7 +1404,7 @@ static void timer_handler(int signum)
 	struct kvm_clock_data clock = {};
 	kvm_ioctl(vmfd, KVM_GET_CLOCK, &clock);
 	if (fwrite(&clock, sizeof(clock), 1, f) != 1)
-		err(1, "fwrite failed");
+		err(1, "fwrite failed\n");
 
 #if 0
 	if (fwrite(guest_mem, guest_size, 1, f) != 1)
@@ -1464,9 +1486,9 @@ nextslot:
 								pgt[l] = pgt[l] & ~(PG_DIRTY|PG_ACCESSED);
 							size_t pgt_entry = pgt[l] & ~PG_PSE; // because PAT use the same bit as PSE
 							if (fwrite(&pgt_entry, sizeof(size_t), 1, f) != 1)
-								err(1, "fwrite failed");
+								err(1, "fwrite failed\n");
 							if (fwrite((size_t*) (guest_mem + (pgt[l] & PAGE_MASK)), (1UL << PAGE_BITS), 1, f) != 1)
-								err(1, "fwrite failed");
+								err(1, "fwrite failed\n");
 						}
 					}
 				} else if ((pgd[k] & flag) == flag) {
@@ -1474,9 +1496,9 @@ nextslot:
 					if (!full_checkpoint)
 						pgd[k] = pgd[k] & ~(PG_DIRTY|PG_ACCESSED);
 					if (fwrite(pgd+k, sizeof(size_t), 1, f) != 1)
-						err(1, "fwrite failed");
+						err(1, "fwrite failed\n");
 					if (fwrite((size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), (1UL << PAGE_2M_BITS), 1, f) != 1)
-						err(1, "fwrite failed");
+						err(1, "fwrite failed\n");
 				}
 			}
 		}
@@ -1485,26 +1507,9 @@ nextslot:
 
 	fclose(f);
 
+	//printf("after mem file dat file\n");
+
 	pthread_barrier_wait(&barrier);
-
-	// update configuration file
-	//FILE* 
-	f = fopen("checkpoint/chk_config.txt", "w");
-	if (f == NULL) {
-		err(1, "fopen: unable to open file");
-	}
-
-	fprintf(f, "number of cores: %u\n", ncores);
-	fprintf(f, "memory size: 0x%zx\n", guest_size);
-	fprintf(f, "checkpoint number: %u\n", no_checkpoint);
-	fprintf(f, "entry point: 0x%zx\n", elf_entry);
-	if (full_checkpoint)
-		fprintf(f, "full checkpoint: 1");
-	else
-		fprintf(f, "full checkpoint: 0");
-
-	fclose(f);
-
 
 	if (verbose) {
 		gettimeofday(&end, NULL);
@@ -1515,12 +1520,25 @@ nextslot:
 
 	no_checkpoint++;
 
-	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
-	{
+	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0)){
+		//printf("before commclient calls\n");
 		commclient("checkpoint/chk_config.txt", "checkpoint", "127.0.0.1");
-		commclient("checkpoint/chk0_core0.dat", "checkpoint", "127.0.0.1");
-		commclient("checkpoint/chk0_mem.dat", "checkpoint", "127.0.0.1");
-		printf("Client transfered checkpoint and stops execution now");
+		for (int j=0; j<no_checkpoint;j++){
+			for(int i=0; i<ncores; i++){
+				char core_files[256];
+				sprintf(core_files, "checkpoint/chk%d_core%d.dat", (no_checkpoint-1), (ncores-1));
+				printf(core_files);
+				commclient(core_files, "checkpoint", "127.0.0.1");
+			}
+		}
+		for (int j=0; j<no_checkpoint;j++){
+				char mem_files[256];
+				sprintf(mem_files, "checkpoint/chk%d_mem.dat", (no_checkpoint-1));
+				printf(mem_files);
+				commclient(mem_files, "checkpoint", "127.0.0.1");
+			}
+		commclient("finished", "checkpoint", "127.0.0.1");
+		printf("Client transfered checkpoint and stops execution now\n");
 		sigterm_handler(SIGTERM);
 	}
 	

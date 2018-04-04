@@ -1042,12 +1042,12 @@ int monitor_main(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
-	int ret;
+	//int ret;
 	int comm_server_ret;
 	int comm_client_ret;
 	char* comm_mode; 
 	
-
+	//sleep(20);
 	comm_mode = getenv("PROXY_COMM");
 	printf("PROXY_COMM is set to: %s\n",comm_mode);
 	if (comm_mode)
