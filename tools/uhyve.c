@@ -486,16 +486,18 @@ static int load_checkpoint(uint8_t* mem, char* path)
 #else
 		if 	((hermit_check>0)&&(strncmp(comm_mode, "server", 6)==0))
 			comm_chunk_server(&mem);
-		while (fread(&location, sizeof(location), 1, f) == 1) {
-			//printf("location 0x%zx\n", location);
-			if (location & PG_PSE)
-				ret = fread((size_t*) (mem + (location & PAGE_2M_MASK)), (1UL << PAGE_2M_BITS), 1, f);
-			else
-				ret = fread((size_t*) (mem + (location & PAGE_MASK)), (1UL << PAGE_BITS), 1, f);
+		else{
+			while (fread(&location, sizeof(location), 1, f) == 1) {
+				//printf("location 0x%zx\n", location);
+				if (location & PG_PSE)
+					ret = fread((size_t*) (mem + (location & PAGE_2M_MASK)), (1UL << PAGE_2M_BITS), 1, f);
+				else
+					ret = fread((size_t*) (mem + (location & PAGE_MASK)), (1UL << PAGE_BITS), 1, f);
 
-			if (ret != 1) {
-				fprintf(stderr, "Unable to read checkpoint: ret = %d", ret);
-				err(1, "fread failed");
+				if (ret != 1) {
+					fprintf(stderr, "Unable to read checkpoint: ret = %d", ret);
+					err(1, "fread failed");
+				}
 			}
 		}
 #endif
@@ -974,6 +976,19 @@ static int vcpu_init(void)
 		struct kvm_xcrs xcrs;
 		struct kvm_vcpu_events events;
 
+		if 	((hermit_check>0)&&(strncmp(comm_mode, "server", 6)==0)){			
+			//msrs=comm_vcpu_register[cpuid].msr_data.entries;
+			sregs=comm_vcpu_register[cpuid].sregs;
+			regs=comm_vcpu_register[cpuid].regs;
+			fpu=comm_vcpu_register[cpuid].fpu;
+			msr_data=comm_vcpu_register[cpuid].msr_data;
+			lapic=comm_vcpu_register[cpuid].lapic;
+			xsave=comm_vcpu_register[cpuid].xsave;
+			xcrs=comm_vcpu_register[cpuid].xcrs;
+			events=comm_vcpu_register[cpuid].events;
+			mp_state=comm_vcpu_register[cpuid].mp_state;
+		}
+		else{
 		snprintf(fname, MAX_FNAME, "checkpoint/chk%u_core%u.dat", no_checkpoint, cpuid);
 
 		FILE* f = fopen(fname, "r");
@@ -1000,20 +1015,8 @@ static int vcpu_init(void)
 			err(1, "fread failed\n");
 
 		fclose(f);
-
-		if 	((hermit_check>0)&&(strncmp(comm_mode, "server", 6)==0))
-		{			
-			//msrs=comm_vcpu_register[cpuid].msr_data.entries;
-			sregs=comm_vcpu_register[cpuid].sregs;
-			regs=comm_vcpu_register[cpuid].regs;
-			fpu=comm_vcpu_register[cpuid].fpu;
-			msr_data=comm_vcpu_register[cpuid].msr_data;
-			lapic=comm_vcpu_register[cpuid].lapic;
-			xsave=comm_vcpu_register[cpuid].xsave;
-			xcrs=comm_vcpu_register[cpuid].xcrs;
-			events=comm_vcpu_register[cpuid].events;
-			mp_state=comm_vcpu_register[cpuid].mp_state;
 		}
+		
 
 		kvm_ioctl(vcpufd, KVM_SET_SREGS, &sregs);
 		kvm_ioctl(vcpufd, KVM_SET_REGS, &regs);
@@ -1198,7 +1201,7 @@ int uhyve_init(char *path)
 	// register routine to close the VM
 	atexit(uhyve_atexit);
 
-	
+	FILE* f = fopen("checkpoint/chk_config.txt", "r");
 	if 	((hermit_check>0)&&(strncmp(comm_mode, "server", 6)==0))
 	{
 		comm_config_server(&config_struct);
@@ -1209,16 +1212,12 @@ int uhyve_init(char *path)
 		full_checkpoint=config_struct.full_checkpoint;
 		if (comm_vcpu_register==NULL)
 			comm_vcpu_register=calloc(ncores,sizeof(comm_register_t));
-		else if (sizeof(comm_vcpu_register)!=sizeof(comm_register_t))
-		{
+		else if (sizeof(comm_vcpu_register)!=sizeof(comm_register_t)){
 			free(comm_vcpu_register);
 			comm_vcpu_register=calloc(ncores,sizeof(comm_register_t));
 		}
 		comm_register_server(&comm_vcpu_register, &cpuid, &ncores);
-	}
-
-	FILE* f = fopen("checkpoint/chk_config.txt", "r");
-	if (f != NULL) {
+	} else if (f != NULL) {
 		int tmp = 0;
 		restart = true;
 
@@ -1232,6 +1231,7 @@ int uhyve_init(char *path)
 		if (verbose)
 			fprintf(stderr, "Restart from checkpoint %u (ncores %d, mem size 0x%zx)\n", no_checkpoint, ncores, guest_size);
 		fclose(f);
+
 	} else {
 		const char* hermit_memory = getenv("HERMIT_MEM");
 		if (hermit_memory)
