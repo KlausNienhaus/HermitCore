@@ -485,7 +485,7 @@ static int load_checkpoint(uint8_t* mem, char* path)
 			err(1, "fread failed");
 #else
 		if 	((hermit_check>0)&&(strncmp(comm_mode, "server", 6)==0))
-			comm_chunk_server(&mem);
+			comm_chunk_server(mem);
 		else{
 			while (fread(&location, sizeof(location), 1, f) == 1) {
 				//printf("location 0x%zx\n", location);
@@ -1137,6 +1137,8 @@ static void save_cpu_state(void)
 		comm_vcpu_register[cpuid].xcrs=xcrs;
 		comm_vcpu_register[cpuid].events=events;
 		comm_vcpu_register[cpuid].mp_state=mp_state;
+		printf("Register for migration send size *comm_vcpu_register %d sizeof(comm_vcpu_register[cpuid])%d\n",sizeof(*comm_vcpu_register),sizeof(comm_vcpu_register[cpuid]));
+		printf("Register for migration send from struct vcpu_register->regs1 %d comm_vcpu_register->lapic %d comm_vcpu_register[cpuid].regs %d comm_vcpu_register[cpuid].lapic %d \n", comm_vcpu_register->regs, comm_vcpu_register->lapic, comm_vcpu_register[cpuid].regs, comm_vcpu_register[cpuid].lapic);
 	}
 
 	fclose(f);
@@ -1210,7 +1212,9 @@ int uhyve_init(char *path)
 			free(comm_vcpu_register);
 			comm_vcpu_register=calloc(ncores,sizeof(comm_register_t));
 		}
-		comm_register_server(&comm_vcpu_register, &cpuid, &ncores);
+		comm_register_server(comm_vcpu_register, &cpuid, &ncores);
+		printf("Register for migration recieved size *comm_vcpu_register %d sizeof(comm_vcpu_register[cpuid])%d\n",sizeof(*comm_vcpu_register),sizeof(comm_vcpu_register[cpuid]));
+		printf("Register for migration recieved from struct vcpu_register->regs1 %d comm_vcpu_register->lapic %d comm_vcpu_register[cpuid].regs %d comm_vcpu_register[cpuid].lapic %d \n", comm_vcpu_register->regs, comm_vcpu_register->lapic, comm_vcpu_register[cpuid].regs, comm_vcpu_register[cpuid].lapic);
 	} else if (f != NULL) {
 		int tmp = 0;
 		restart = true;
@@ -1430,11 +1434,11 @@ static void timer_handler(int signum)
 	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
 	{
 		comm_config_t checkpoint_config;
-		checkpoint_config.ncores=&ncores;
-		checkpoint_config.guest_size=&guest_size;
-		checkpoint_config.no_checkpoint=&no_checkpoint;
-		checkpoint_config.elf_entry=&elf_entry;
-		checkpoint_config.full_checkpoint=&full_checkpoint;
+		checkpoint_config.ncores=ncores;
+		checkpoint_config.guest_size=guest_size;
+		checkpoint_config.no_checkpoint=no_checkpoint;
+		checkpoint_config.elf_entry=elf_entry;
+		checkpoint_config.full_checkpoint=full_checkpoint;
 		comm_config_client(&checkpoint_config, comm_new_host, "config", "NULL");
 		if (comm_vcpu_register==NULL)
 			comm_vcpu_register=calloc(ncores,sizeof(comm_register_t));
@@ -1456,7 +1460,7 @@ static void timer_handler(int signum)
 
 	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
 	{
-		comm_register_client(&comm_vcpu_register, cpuid, ncores, comm_new_host, "register", "NULL");
+		comm_register_client(comm_vcpu_register, &cpuid, &ncores, comm_new_host, "register", "NULL");
 	}
 
 	snprintf(fname, MAX_FNAME, "checkpoint/chk%u_mem.dat", no_checkpoint);
@@ -1527,7 +1531,7 @@ nextslot:
 					if (fwrite((size_t*) (guest_mem + addr), PAGE_SIZE, 1, f) != 1)
 						err(1, "fwrite failed");
 					if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
-						comm_chunk_client(&addr, (size_t*) (guest_mem + addr), PAGE_SIZE, comm_new_host, "mem","PAGE_SIZE");
+						comm_chunk_client(&addr, (size_t*) (guest_mem + addr), (unsigned long*)PAGE_SIZE, comm_new_host, "mem","PAGE_SIZE");
 				}
 			}
 		}
@@ -1569,7 +1573,7 @@ nextslot:
 							if (fwrite((size_t*) (guest_mem + (pgt[l] & PAGE_MASK)), (1UL << PAGE_BITS), 1, f) != 1)
 								err(1, "fwrite failed");
 							if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
-								comm_chunk_client(&pgt_entry, (size_t*)(guest_mem + (pgt[l] & PAGE_MASK)), (1UL << PAGE_BITS), comm_new_host, "mem","PAGE_BITS");
+								comm_chunk_client(&pgt_entry, (size_t*)(guest_mem + (pgt[l] & PAGE_MASK)), (unsigned long*)(1UL << PAGE_BITS), comm_new_host, "mem","PAGE_BITS");
 
 						}
 					}
@@ -1582,7 +1586,7 @@ nextslot:
 					if (fwrite((size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), (1UL << PAGE_2M_BITS), 1, f) != 1)
 						err(1, "fwrite failed");
 					if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
-						comm_chunk_client(pgd+k, (size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), (1UL << PAGE_2M_BITS), comm_new_host, "mem","PAGE_2M_BITS");
+						comm_chunk_client(pgd+k, (size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), (unsigned long*)(1UL << PAGE_2M_BITS), comm_new_host, "mem","PAGE_2M_BITS");
 				}
 			}
 		}
@@ -1605,9 +1609,9 @@ nextslot:
 
 	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
 	{
-		commclient("checkpoint/chk_config.txt","checkpoint",comm_new_host);
-		commclient("checkpoint/chk0_core0.dat","checkpoint",comm_new_host);
-		commclient("checkpoint/chk0_mem.dat","checkpoint",comm_new_host);
+		//commclient("checkpoint/chk_config.txt","checkpoint",comm_new_host);
+		//commclient("checkpoint/chk0_core0.dat","checkpoint",comm_new_host);
+		//commclient("checkpoint/chk0_mem.dat","checkpoint",comm_new_host);
 		//free(comm_vcpu_register);
 		//comm_vcpu_register = NULL;
 		printf("Client transfered checkpoint and stops execution now\n");

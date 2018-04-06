@@ -54,14 +54,14 @@ int commserver(void)
         perror("socket failed\n");
         exit(EXIT_FAILURE);
     }
-     /* 
+    
     // enable reuse of port and address
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
     {
         perror("setsockopt failed");
         exit(EXIT_FAILURE);
     }
-    */
+    
 
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
@@ -264,7 +264,7 @@ int commclient(char *path, char *position, char *server_ip)
 }
 
 
-int comm_config_server(comm_register_t *checkpoint_config)
+int comm_config_server(comm_config_t *checkpoint_config)
 {
     int server_fd, new_conn_fd; //data_size;
     struct sockaddr_in address;
@@ -278,14 +278,14 @@ int comm_config_server(comm_register_t *checkpoint_config)
         perror("socket failed\n");
         exit(EXIT_FAILURE);
     }
-     /* 
+     
     // enable reuse of port and address
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
     {
         perror("setsockopt failed");
         exit(EXIT_FAILURE);
     }
-    */
+    
 
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
@@ -318,19 +318,20 @@ int comm_config_server(comm_register_t *checkpoint_config)
         recv(new_conn_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
         recv(new_conn_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
         recv(new_conn_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
-        printf("metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
+        printf("In Config_server meta_data.filesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
 
-        if (meta_data.data_name=="config" && meta_data.data_position=="NULL")
-        {
+        if (strcmp(meta_data.data_name,"config")==0){
             int nrecv = 0;
             while (nrecv<sizeof(meta_data.data_size))
-                nrecv += recv(new_conn_fd, (void*)&checkpoint_config+nrecv, sizeof(meta_data.data_size)-nrecv, 0);
+                nrecv += recv(new_conn_fd, (void*)checkpoint_config+nrecv, sizeof(meta_data.data_size)-nrecv, 0);
             if (nrecv<(sizeof(meta_data.data_size)))
                 perror("Register recieved incomplete\n");
             else if (nrecv=sizeof(meta_data.data_size))
                 break;
+        }else{
+            printf("config_server wrong meta_data: Name %s, Position: %s in config recieved\n", meta_data.data_name, meta_data);
+            exit(EXIT_FAILURE);
         }
-        else printf("wrong meta_data %s in config recieved\n", meta_data.data_name);
         
     }
 
@@ -338,7 +339,6 @@ int comm_config_server(comm_register_t *checkpoint_config)
     close(server_fd);
     return 0;
 }
-
 
 //@brief:   Client side C function for TCP Socket Connections sending Config of checkpoint
 //          atm sends Config to server (e.g. checkpoint)
@@ -349,7 +349,7 @@ int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *
     int client_fd = 0; //data_size;
     char buffer[1024] = {0};
     comm_socket_header_t meta_data;
-    comm_type = "config";
+    //comm_type = "config";
      
     
     // starting socket in IPv4 mode as AF_INET indicates
@@ -379,7 +379,8 @@ int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *
     //data_name and data_position in this case codes the type of transfer comming for comm_server
     strcpy(meta_data.data_name, comm_type);
     strcpy(meta_data.data_position, comm_subtype);
-    meta_data.data_size = (sizeof(checkpoint_config));
+    meta_data.data_size = (sizeof(comm_config_t));
+    printf("Config client sizeof(comm_config_t) %d, sizeof(*checkpoint_config) %d, sizeof(&checkpoint_config) %d",sizeof(comm_config_t), sizeof(*checkpoint_config), sizeof(&checkpoint_config));
     int nsent = send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
     nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
     nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
@@ -387,15 +388,15 @@ int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *
         {
             perror("Meta_data not correct send \n");
             exit(EXIT_FAILURE);
-        } 
+        }
 
     //printf("Sending \n");
     nsent=0;
-    while(nsent<sizeof(checkpoint_config))
+    while(nsent<sizeof(comm_config_t))
     {
-        nsent += send(client_fd, (void*)&checkpoint_config+nsent, sizeof(checkpoint_config)-nsent, 0);
+        nsent += send(client_fd, (void*)(comm_config_t*)checkpoint_config+nsent, sizeof(comm_config_t)-nsent, 0);
     }
-    if (nsent < (sizeof(checkpoint_config)))
+    if (nsent < (sizeof(comm_config_t)))
     {
         perror("Config for migration not correct send \n");
         exit(EXIT_FAILURE);
@@ -421,14 +422,14 @@ int comm_register_server(comm_register_t *vcpu_register, uint32_t *cpuid, uint32
         perror("socket failed\n");
         exit(EXIT_FAILURE);
     }
-     /* 
+     
     // enable reuse of port and address
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
     {
         perror("setsockopt failed");
         exit(EXIT_FAILURE);
     }
-    */
+    
 
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
@@ -457,27 +458,29 @@ int comm_register_server(comm_register_t *vcpu_register, uint32_t *cpuid, uint32
             exit(EXIT_FAILURE);
         }
         
-        meta_data.data_size=(sizeof(vcpu_register));
         // recieving file metadata for positioning, name and size from client 
         recv(new_conn_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
         recv(new_conn_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
         recv(new_conn_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
-        printf("metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
+        printf("In register_server metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
 
-        if (meta_data.data_name=="register" && meta_data.data_position=="NULL")
+        if(strcmp(meta_data.data_name,"register")==0)
         {
             int nrecv = 0;
             while (nrecv<sizeof(meta_data.data_size))
-                nrecv += recv(new_conn_fd, (void*)&vcpu_register+nrecv, (sizeof(meta_data.data_size))-nrecv, 0);
+                nrecv += recv(new_conn_fd, (void*)vcpu_register+nrecv, (sizeof(meta_data.data_size))-nrecv, 0);
             if (nrecv<(sizeof(meta_data.data_size)))
                 perror("Register recieved incomplete\n");
             else if (nrecv=(sizeof(meta_data.data_size)))
                 break;
+        }else {
+        printf("wrong meta_data %s in register recieved", meta_data.data_name);
+        exit(EXIT_FAILURE);
         }
         
+        
     }
-
-    printf("Register for migration recieved\n");
+    printf("Register for migration recieved size %d regs1 %d lapic %d\n",sizeof(*vcpu_register),vcpu_register->regs, vcpu_register->lapic);
     close(server_fd);
     return 0;
 }
@@ -525,7 +528,8 @@ int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32
     //path in this case codes the type of transfer comming
     strcpy(meta_data.data_name, comm_type);
     strcpy(meta_data.data_position, comm_subtype);
-    meta_data.data_size = (sizeof(vcpu_register));
+    meta_data.data_size=(sizeof(*vcpu_register));
+    printf("((*ncores*sizeof(comm_register_t)) %d ,sizeof(*vcpu_register) %d\n", (*ncores*sizeof(comm_register_t)),sizeof(*vcpu_register) );
     int nsent = send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
     nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
     nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
@@ -535,18 +539,21 @@ int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32
             exit(EXIT_FAILURE);
         } 
 
+    
     //printf("Sending \n");
     nsent=0;
-    while(nsent<(sizeof(vcpu_register)))
+    while(nsent<(sizeof(*vcpu_register)))
     {
-        nsent += send(client_fd, (void*)&vcpu_register+nsent, (sizeof(vcpu_register))-nsent, 0);
+        nsent += send(client_fd, (void*)vcpu_register+nsent, (sizeof(*vcpu_register))-nsent, 0);
     }
-    if (nsent < (sizeof(vcpu_register)))
+    if (nsent < (sizeof(*vcpu_register)))
         {
             perror("Register not correct send \n");
             exit(EXIT_FAILURE);
         } 
-   
+    
+    printf("Register for migration send size %d regs1 %d lapic %d\n",sizeof(*vcpu_register),vcpu_register->regs, vcpu_register->lapic);
+
     close(client_fd);
     return 0;
 }
@@ -567,14 +574,14 @@ int comm_clock_server(struct kvm_clock_data *clock)
         perror("socket failed\n");
         exit(EXIT_FAILURE);
     }
-     /* 
+    
     // enable reuse of port and address
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
     {
         perror("setsockopt failed");
         exit(EXIT_FAILURE);
     }
-    */
+    
 
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
@@ -606,9 +613,9 @@ int comm_clock_server(struct kvm_clock_data *clock)
         recv(new_conn_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
         recv(new_conn_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
         recv(new_conn_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
-        printf("metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
+        printf("In clock_server metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
 
-        if (meta_data.data_name=="clock" && meta_data.data_position=="NULL")
+        if (strcmp(meta_data.data_name,"clock")==0)
         {
             int nrecv = 0;
             while (nrecv<sizeof(clock))
@@ -618,7 +625,10 @@ int comm_clock_server(struct kvm_clock_data *clock)
             else if (nrecv=sizeof(clock))
                 break;
         }
-        else printf("wrong meta_data %s in clock recieved", meta_data.data_name);
+        else {
+        printf("wrong meta_data %s in clock recieved", meta_data.data_name);
+        exit(EXIT_FAILURE);
+        }
         
     }
 
@@ -680,7 +690,7 @@ int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_
     nsent=0;
     while(nsent<sizeof(clock))
     {
-        nsent += send(client_fd, (void*)&clock+nsent, sizeof(clock)-nsent, 0);
+        nsent += send(client_fd, (void*)clock+nsent, sizeof(clock)-nsent, 0);
     }
     if (nsent < (sizeof(clock)))
         {
@@ -695,7 +705,7 @@ int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_
 //TODO: adding loop for all tables until all mem tables are recieved
 //size_t *pgdpgt, size_t *mem_chunck, unsigned long *masksize
 
-int comm_chunk_server(uint8_t *mem)
+int comm_chunk_server(uint8_t* mem)
 {
     int server_fd, new_conn_fd; //data_size;
     struct sockaddr_in address;
@@ -713,14 +723,14 @@ int comm_chunk_server(uint8_t *mem)
         perror("Socket failed\n");
         exit(EXIT_FAILURE);
     }
-     /* 
+    
     // enable reuse of port and address
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
     {
         perror("setsockopt failed");
         exit(EXIT_FAILURE);
     }
-    */
+    
 
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
@@ -752,10 +762,10 @@ int comm_chunk_server(uint8_t *mem)
         recv(new_conn_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
         recv(new_conn_fd, (void*)&meta_data.data_size, sizeof(unsigned long), 0);
         recv(new_conn_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
-        printf("metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
+        printf("In chunk_server metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
 
         //printf("Sending \n");
-        if (meta_data.data_name=="mem")
+        if (strcmp(meta_data.data_name,"mem")==0)
         {         
             int nrecv1=0;
             while(nrecv1<sizeof(size_t))
@@ -791,10 +801,13 @@ int comm_chunk_server(uint8_t *mem)
                 perror("Memory chunk not correct recieved \n");
                 //exit(EXIT_FAILURE);
             }
-        } 
-        else if(meta_data.data_name=="mem" && meta_data.data_position=="finished")
+        }else if(strcmp(meta_data.data_name,"mem")==0 && strcmp(meta_data.data_name,"finished")==0)
             break;
+        else{
+            perror("data_name in chunk_server wrong \n");
+            exit(EXIT_FAILURE);
         }
+    }
           
 
     printf("Memory for migration recieved\n");
@@ -878,7 +891,7 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, unsigned long *masksiz
             exit(EXIT_FAILURE);
         } 
 
-    if(meta_data.data_name=="mem")
+    if(strcmp(meta_data.data_name,"mem")==0)
     {
     //printf("Sending \n");
     int nsent1=0;
@@ -910,6 +923,10 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, unsigned long *masksiz
                 perror("Memory not correct send not correct send \n");
                 exit(EXIT_FAILURE);
             }
+    }
+    else {
+        perror("Data_Name wrong in comm_chunk_client\n");
+        exit(EXIT_FAILURE);
     }
      
     close(client_fd);

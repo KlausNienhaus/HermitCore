@@ -116,7 +116,7 @@ int commserver(void);
 int commclient(char *path, char *position, char *server_ip);
 
 
-int comm_config_server(comm_register_t *checkpoint_config);
+int comm_config_server(comm_config_t *checkpoint_config);
 int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *comm_type, char *comm_subtype);
 
 int comm_register_server(comm_register_t *vcpu_register, uint32_t *cpuid, uint32_t *ncores);
