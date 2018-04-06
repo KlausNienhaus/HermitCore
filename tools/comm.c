@@ -105,8 +105,7 @@ int commserver(void)
         recv(new_conn_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
         printf("metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
 
-        // hardcoded for testing purposes atm
-        //strcpy(meta_data.data_name, "checkpoint/chk_config_copy.txt"); //"checkpoint/testcopy_Abrechnung.xlsm"
+       
         if (stat(meta_data.data_position, &st) == -1)
 		    mkdir(meta_data.data_position, 0700);
 
@@ -231,7 +230,7 @@ int commclient(char *path, char *position, char *server_ip)
     //printf("path %s", path);
     if (strcmp(meta_data.data_name,"finished")==0) {
             printf("all checkpoint files send\n");
-            meta_data.data_size=NULL;
+            meta_data.data_size=0;
             printf("metafilesize: %d to filename: %s and position: %s \n " , meta_data.data_size, meta_data.data_name, meta_data.data_position);
             int nsent = send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
             nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(int), 0);

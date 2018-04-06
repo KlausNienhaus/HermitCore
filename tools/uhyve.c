@@ -1527,14 +1527,14 @@ nextslot:
 			for(int i=0; i<ncores; i++){
 				char core_files[256];
 				sprintf(core_files, "checkpoint/chk%d_core%d.dat", (no_checkpoint-1), (ncores-1));
-				printf(core_files);
+				//printf(core_files);
 				commclient(core_files, "checkpoint", "127.0.0.1");
 			}
 		}
 		for (int j=0; j<no_checkpoint;j++){
 				char mem_files[256];
 				sprintf(mem_files, "checkpoint/chk%d_mem.dat", (no_checkpoint-1));
-				printf(mem_files);
+				//printf(mem_files);
 				commclient(mem_files, "checkpoint", "127.0.0.1");
 			}
 		commclient("finished", "checkpoint", "127.0.0.1");
