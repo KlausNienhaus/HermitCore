@@ -967,10 +967,7 @@ static int vcpu_init(void)
 		char fname[MAX_FNAME];
 		struct kvm_sregs sregs;
 		struct kvm_fpu fpu;
-		struct {
-			struct kvm_msrs info;
-			struct kvm_msr_entry entries[MAX_MSR_ENTRIES];
-		} msr_data;
+		struct msr_data msr_data;
 		struct kvm_lapic_state lapic;
 		struct kvm_xsave xsave;
 		struct kvm_xcrs xcrs;
@@ -1059,10 +1056,7 @@ static int vcpu_init(void)
 
 static void save_cpu_state(void)
 {
-	struct {
-		struct kvm_msrs info;
-		struct kvm_msr_entry entries[MAX_MSR_ENTRIES];
-	} msr_data;
+	struct msr_data msr_data;
 	struct kvm_msr_entry *msrs = msr_data.entries;
 	struct kvm_regs regs;
 	struct kvm_sregs sregs;

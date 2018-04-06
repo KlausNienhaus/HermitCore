@@ -818,14 +818,6 @@ while (fread(&location, sizeof(location), 1, f) == 1) {
 				err(1, "fread failed");
 			}
 
-if (masksize == (1UL << PAGE_2M_BITS))
-
-
-    strcpy(meta_data.data_name, path); //"checkpoint/Abrechnung.xlsm" "checkpoint/chk_config.txt"
-    strcpy(meta_data.data_position, position);
-    if (stat(meta_data.data_position, &st) == -1)
-		mkdir(meta_data.data_position, 0700);
-
 */
 
 //@brief:   Client side C function for TCP Socket Connections sending Memory Chunk

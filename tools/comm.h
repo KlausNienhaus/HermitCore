@@ -80,15 +80,16 @@ typedef struct comm_socket_header{
     char    data_position[1024]; /* Data/File Path */
 } comm_socket_header_t;
 
-
 struct msr_data{
 	struct kvm_msrs info;
 	struct kvm_msr_entry entries[MAX_MSR_ENTRIES];
 };
+
+
 typedef struct comm_register{
 	//msr_data_t mrs_data;
 	//struct kvm_msr_entry *msrs;
-	struct mrs_data msr_data;
+	struct msr_data msr_data;
 	struct kvm_regs regs;
 	struct kvm_sregs sregs;
 	struct kvm_fpu fpu;
@@ -108,6 +109,8 @@ typedef struct comm_config{
 	uint64_t 	elf_entry; 
 	bool 		full_checkpoint;
 }comm_config_t;
+
+
 
 int commserver(void);
 int commclient(char *path, char *position, char *server_ip);
