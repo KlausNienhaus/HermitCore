@@ -191,6 +191,8 @@ static __thread uint32_t cpuid = 0;
 
 static char *hermit_check = NULL; // = getenv("HERMIT_CHECKPOINT"); at program start
 static char *comm_mode = NULL; // = getenv("PROXY_COMM"); at program start
+//comm_register_t (*comm_vcpu_register)[];
+//test_t (*test_array_ptr)[];
 comm_register_t *comm_vcpu_register = NULL;
 static char *comm_new_host = "127.0.0.1";
 
@@ -978,7 +980,7 @@ static int vcpu_init(void)
 			sregs=comm_vcpu_register[cpuid].sregs;
 			regs=comm_vcpu_register[cpuid].regs;
 			fpu=comm_vcpu_register[cpuid].fpu;
-			msr_data=comm_vcpu_register[cpuid].msr_data;
+			msr_data=comm_vcpu_register[cpuid].comm_msr_data;
 			lapic=comm_vcpu_register[cpuid].lapic;
 			xsave=comm_vcpu_register[cpuid].xsave;
 			xcrs=comm_vcpu_register[cpuid].xcrs;
@@ -1131,14 +1133,16 @@ static void save_cpu_state(void)
 		comm_vcpu_register[cpuid].sregs=sregs;
 		comm_vcpu_register[cpuid].regs=regs;
 		comm_vcpu_register[cpuid].fpu=fpu;
-		comm_vcpu_register[cpuid].msr_data=msr_data;
+		comm_vcpu_register[cpuid].comm_msr_data=msr_data;
 		comm_vcpu_register[cpuid].lapic=lapic;
 		comm_vcpu_register[cpuid].xsave=xsave;
 		comm_vcpu_register[cpuid].xcrs=xcrs;
 		comm_vcpu_register[cpuid].events=events;
 		comm_vcpu_register[cpuid].mp_state=mp_state;
-		printf("Register for migration send size *comm_vcpu_register %d sizeof(comm_vcpu_register[cpuid])%d\n",sizeof(*comm_vcpu_register),sizeof(comm_vcpu_register[cpuid]));
-		printf("Register for migration send from struct vcpu_register->regs1 %d comm_vcpu_register->lapic %d comm_vcpu_register[cpuid].regs %d comm_vcpu_register[cpuid].lapic %d \n", comm_vcpu_register->regs, comm_vcpu_register->lapic, comm_vcpu_register[cpuid].regs, comm_vcpu_register[cpuid].lapic);
+		printf("\nIn save_cpu_state to_send sizeof(sregs)+sizeof(regs)+sizeof(fpu)+sizeof(msr_data)+sizeof(lapic)+sizeof(xsave)+sizeof(xcrs)+sizeof(events)+sizeof(mp_state) %d \n", sizeof(sregs)+sizeof(regs)+sizeof(fpu)+sizeof(msr_data)+sizeof(lapic)+sizeof(xsave)+sizeof(xcrs)+sizeof(events)+sizeof(mp_state));
+		printf("\nIn save_cpu_state to_send sizeof *comm_vcpu_register %d sizeof(comm_vcpu_register[cpuid]) %d sizeof(comm_vcpu_register[cpuid].regs) %d,sizeof(sregs) %d \n",sizeof(*comm_vcpu_register),sizeof(comm_vcpu_register[cpuid]) ,sizeof(comm_vcpu_register[cpuid].regs),sizeof(regs));
+		printf("\nInsave_cpu_state to_send regs %d comm_vcpu_register[cpuid].regs %d lapic %d comm_vcpu_register[cpuid].lapic %d \n", regs, comm_vcpu_register[cpuid].regs, lapic ,comm_vcpu_register[cpuid].lapic);
+		printf("\nInsave_cpu_state to_send regs %d comm_vcpu_register[cpuid]->regs %d lapic %d comm_vcpu_register[cpuid]->lapic %d \n", regs, comm_vcpu_register[cpuid].regs, lapic ,comm_vcpu_register[cpuid].lapic);
 	}
 
 	fclose(f);
@@ -1206,15 +1210,18 @@ int uhyve_init(char *path)
 		no_checkpoint=config_struct.no_checkpoint;
 		elf_entry=config_struct.elf_entry;
 		full_checkpoint=config_struct.full_checkpoint;
+		//comm_register_t vcpu_register[ncores];
 		if (comm_vcpu_register==NULL)
+			//comm_vcpu_register = vcpu_register;
 			comm_vcpu_register=calloc(ncores,sizeof(comm_register_t));
 		else if (sizeof(comm_vcpu_register)!=sizeof(comm_register_t)){
 			free(comm_vcpu_register);
+			//comm_vcpu_register = vcpu_register;
 			comm_vcpu_register=calloc(ncores,sizeof(comm_register_t));
 		}
 		comm_register_server(comm_vcpu_register, &cpuid, &ncores);
-		printf("Register for migration recieved size *comm_vcpu_register %d sizeof(comm_vcpu_register[cpuid])%d\n",sizeof(*comm_vcpu_register),sizeof(comm_vcpu_register[cpuid]));
-		printf("Register for migration recieved from struct vcpu_register->regs1 %d comm_vcpu_register->lapic %d comm_vcpu_register[cpuid].regs %d comm_vcpu_register[cpuid].lapic %d \n", comm_vcpu_register->regs, comm_vcpu_register->lapic, comm_vcpu_register[cpuid].regs, comm_vcpu_register[cpuid].lapic);
+		printf("\nIn uhyve_init recieved size *comm_vcpu_register %d sizeof((comm_vcpu_register+cpuid))%d\n",sizeof(*comm_vcpu_register),sizeof((comm_vcpu_register+cpuid)));
+		printf("\nIn uhyve_init recieved struct vcpu_register->regs %d comm_vcpu_register->lapic %d comm_vcpu_register[cpuid].regs %d comm_vcpu_register[cpuid].lapic %d \n", comm_vcpu_register[cpuid].regs, comm_vcpu_register[cpuid].lapic, comm_vcpu_register[0].regs, comm_vcpu_register[0].lapic);
 	} else if (f != NULL) {
 		int tmp = 0;
 		restart = true;
@@ -1438,13 +1445,17 @@ static void timer_handler(int signum)
 		checkpoint_config.guest_size=guest_size;
 		checkpoint_config.no_checkpoint=no_checkpoint;
 		checkpoint_config.elf_entry=elf_entry;
+		//printf("before sending to server vcpu_register[cpuid].regs %d, vcpu_register[cpuid].lapic %d \n", comm_vcpu_register[i].regs, comm_vcpu_register[i].lapic);
 		checkpoint_config.full_checkpoint=full_checkpoint;
+		//comm_register_t vcpu_register[ncores];
 		comm_config_client(&checkpoint_config, comm_new_host, "config", "NULL");
 		if (comm_vcpu_register==NULL)
+			//comm_vcpu_register = vcpu_register;
 			comm_vcpu_register=calloc(ncores,sizeof(comm_register_t));
 		else if (sizeof(comm_vcpu_register)!=sizeof(comm_register_t)*ncores)
 		{
 			free(comm_vcpu_register);
+			//comm_vcpu_register = vcpu_register;
 			comm_vcpu_register=calloc(ncores,sizeof(comm_register_t));
 		}
 	}
@@ -1460,6 +1471,8 @@ static void timer_handler(int signum)
 
 	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
 	{
+		for(int i=0;i<ncores;i++)
+			printf("before sending to server vcpu_register[cpuid].regs %d, vcpu_register[cpuid].lapic %d \n", comm_vcpu_register[i].regs, comm_vcpu_register[i].lapic);
 		comm_register_client(comm_vcpu_register, &cpuid, &ncores, comm_new_host, "register", "NULL");
 	}
 

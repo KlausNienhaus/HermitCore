@@ -380,7 +380,7 @@ int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *
     strcpy(meta_data.data_name, comm_type);
     strcpy(meta_data.data_position, comm_subtype);
     meta_data.data_size = (sizeof(comm_config_t));
-    printf("Config client sizeof(comm_config_t) %d, sizeof(*checkpoint_config) %d, sizeof(&checkpoint_config) %d",sizeof(comm_config_t), sizeof(*checkpoint_config), sizeof(&checkpoint_config));
+    //printf("Config client sizeof(comm_config_t) %d, sizeof(*checkpoint_config) %d, sizeof(&checkpoint_config) %d",sizeof(comm_config_t), sizeof(*checkpoint_config), sizeof(&checkpoint_config));
     int nsent = send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
     nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
     nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
@@ -480,7 +480,8 @@ int comm_register_server(comm_register_t *vcpu_register, uint32_t *cpuid, uint32
         
         
     }
-    printf("Register for migration recieved size %d regs1 %d lapic %d\n",sizeof(*vcpu_register),vcpu_register->regs, vcpu_register->lapic);
+    printf("In comm_register_server recieved size %d vcpu_register->regs %d cpu_register->lapic %d\n",sizeof(*vcpu_register),vcpu_register->regs, vcpu_register->lapic);
+    printf("In comm_register_server recieved size %d vcpu_register[*cpuid].regs %d vcpu_register[*cpuid].lapic %d\n", vcpu_register[*cpuid].regs, vcpu_register[*cpuid].lapic);
     close(server_fd);
     return 0;
 }
@@ -529,7 +530,7 @@ int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32
     strcpy(meta_data.data_name, comm_type);
     strcpy(meta_data.data_position, comm_subtype);
     meta_data.data_size=(sizeof(*vcpu_register));
-    printf("((*ncores*sizeof(comm_register_t)) %d ,sizeof(*vcpu_register) %d\n", (*ncores*sizeof(comm_register_t)),sizeof(*vcpu_register) );
+    //printf("((*ncores*sizeof(comm_register_t)) %d ,sizeof(*vcpu_register) %d\n", (*ncores*sizeof(comm_register_t)),sizeof(*vcpu_register) );
     int nsent = send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
     nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
     nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
@@ -552,7 +553,8 @@ int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32
             exit(EXIT_FAILURE);
         } 
     
-    printf("Register for migration send size %d regs1 %d lapic %d\n",sizeof(*vcpu_register),vcpu_register->regs, vcpu_register->lapic);
+    printf("In comm_register_client send size %d vcpu_register->regs %d vcpu_register->lapic %d\n",sizeof(*vcpu_register),vcpu_register->regs, vcpu_register->lapic);
+    printf("In comm_register_client send size %d vcpu_register[*cpuid].regs %d vcpu_register[*cpuid].lapic %d\n",vcpu_register[*cpuid].regs, vcpu_register[*cpuid].lapic);
 
     close(client_fd);
     return 0;

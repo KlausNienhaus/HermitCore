@@ -89,7 +89,7 @@ struct msr_data{
 typedef struct comm_register{
 	//msr_data_t mrs_data;
 	//struct kvm_msr_entry *msrs;
-	struct msr_data msr_data;
+	struct msr_data comm_msr_data;
 	struct kvm_regs regs;
 	struct kvm_sregs sregs;
 	struct kvm_fpu fpu;
