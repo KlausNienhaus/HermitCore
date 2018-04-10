@@ -90,9 +90,18 @@ int commserver(void)
         }
         
         // recieving file metadata for positioning, name and size from client 
-        recv(new_conn_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
-        recv(new_conn_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
-        recv(new_conn_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
+        int nrecv = 0;
+        while (nrecv<(sizeof(buffer)))
+            nrecv+=recv(new_conn_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
+        while (nrecv<(sizeof(buffer)+sizeof(uint)))
+            nrecv+=recv(new_conn_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
+        while (nrecv<(sizeof(buffer)+sizeof(uint)+sizeof(buffer)))
+            nrecv+=recv(new_conn_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
+        if (nrecv < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
+        {
+            perror("Meta_data not correct send \n");
+            exit(EXIT_FAILURE);
+        }
         printf("metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
 
     
@@ -112,12 +121,14 @@ int commserver(void)
         // recieve data and write to file
         while(1)
         {
-            // first read file in chunks of buffer bytes
             int recv_writen = 0;
-            int valrecv = recv(new_conn_fd , buffer, sizeof(buffer), 0);
+            int valrecv = 0;
+            while(valrecv > 0){
+            // first read file in chunks of buffer bytes
+            valrecv = recv(new_conn_fd , buffer, sizeof(buffer), 0);
             //printf("Bytes recieved %d \n", valrecv);        
             // if recv was success, write data to file.
-            if(valrecv > 0){
+                if (valrecv > 0)
                 //printf("Writing buffer to file \n");
                 recv_writen += fwrite(buffer, sizeof(char), valrecv, fp);
             }
@@ -217,28 +228,38 @@ int commclient(char *path, char *position, char *server_ip)
    
     // sending file meta information to server before sending file
     printf("metafilesize: %d to filename: %s and position: %s \n " , meta_data.data_size, meta_data.data_name, meta_data.data_position);
-    int nsent = send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
-    nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
-    nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
+    int nsent=0;
+    while (nsent<sizeof(buffer))
+        nsent += send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
+    while (nsent<(sizeof(buffer)+sizeof(uint)))    
+        nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
+    while (nsent<(sizeof(buffer)+sizeof(uint)+sizeof(buffer)))
+        nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
     if (nsent < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
         {
             perror("Meta_data not correct send \n");
             exit(EXIT_FAILURE);
-        } 
+        }
 
         
     // read data from file and send it
     while(1)
     {
+        int nread = 0;
+
+
         // reading file in chunks of buffer bytes
-        int nread = fread(buffer,sizeof(char),sizeof(buffer),fp);
+        nread = fread(buffer,sizeof(char),sizeof(buffer),fp);
         //printf("Bytes read %d \n", nread);        
 
         // succesive reading leads to sending the data. 
         if(nread > 0)
         {
+            int nsend = 0;
+            while (nsend < sizeof(buffer))
+                nsend+=send(client_fd, buffer, nread, 0);
             //printf("Sending \n");
-            send(client_fd, buffer, nread, 0);
+            
         }
       
         // checking if end of file was reached or error occured     
@@ -315,15 +336,24 @@ int comm_config_server(comm_config_t *checkpoint_config)
         }
         
         // recieving file metadata for positioning, name and size from client 
-        recv(new_conn_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
-        recv(new_conn_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
-        recv(new_conn_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
-        printf("In Config_server meta_data.filesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
+        int nrecv = 0;
+        while (nrecv<(sizeof(buffer)))
+            nrecv+=recv(new_conn_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
+        while (nrecv<(sizeof(buffer)+sizeof(uint)))
+            nrecv+=recv(new_conn_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
+        while (nrecv<(sizeof(buffer)+sizeof(uint)+sizeof(buffer)))
+            nrecv+=recv(new_conn_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
+        if (nrecv < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
+        {
+            perror("Meta_data not correct send \n");
+            exit(EXIT_FAILURE);
+        }
+        //printf("In comm_config_server recieved sizeof(checkpoint_config) %d, checkpoint_config.elf_entry %d, checkpoint_config.guest_size %d",sizeof(checkpoint_config), checkpoint_config.elf_entry , checkpoint_config.guest_size);
 
         if (strcmp(meta_data.data_name,"config")==0){
             int nrecv = 0;
             while (nrecv<sizeof(meta_data.data_size))
-                nrecv += recv(new_conn_fd, (void*)checkpoint_config+nrecv, sizeof(meta_data.data_size)-nrecv, 0);
+                nrecv += recv(new_conn_fd, (void*)((size_t)checkpoint_config+nrecv), sizeof(meta_data.data_size)-nrecv, 0);
             if (nrecv<(sizeof(meta_data.data_size)))
                 perror("Register recieved incomplete\n");
             else if (nrecv=sizeof(meta_data.data_size))
@@ -380,10 +410,14 @@ int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *
     strcpy(meta_data.data_name, comm_type);
     strcpy(meta_data.data_position, comm_subtype);
     meta_data.data_size = (sizeof(comm_config_t));
-    //printf("Config client sizeof(comm_config_t) %d, sizeof(*checkpoint_config) %d, sizeof(&checkpoint_config) %d",sizeof(comm_config_t), sizeof(*checkpoint_config), sizeof(&checkpoint_config));
-    int nsent = send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
-    nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
-    nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
+    //printf("In Comm_Config_client sent sizeof(checkpoint_config) %d, checkpoint_config.elf_entry %d, checkpoint_config.guest_size %d",sizeof(checkpoint_config), checkpoint_config.elf_entry , checkpoint_config.guest_size);
+    int nsent=0;
+    while (nsent<sizeof(buffer))
+        nsent += send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
+    while (nsent<(sizeof(buffer)+sizeof(uint)))    
+        nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
+    while (nsent<(sizeof(buffer)+sizeof(uint)+sizeof(buffer)))
+        nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
     if (nsent < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
         {
             perror("Meta_data not correct send \n");
@@ -394,7 +428,7 @@ int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *
     nsent=0;
     while(nsent<sizeof(comm_config_t))
     {
-        nsent += send(client_fd, (void*)(comm_config_t*)checkpoint_config+nsent, sizeof(comm_config_t)-nsent, 0);
+        nsent += send(client_fd, (void*)((size_t)checkpoint_config+nsent), sizeof(comm_config_t)-nsent, 0);
     }
     if (nsent < (sizeof(comm_config_t)))
     {
@@ -458,17 +492,27 @@ int comm_register_server(comm_register_t *vcpu_register, uint32_t *cpuid, uint32
             exit(EXIT_FAILURE);
         }
         
-        // recieving file metadata for positioning, name and size from client 
-        recv(new_conn_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
-        recv(new_conn_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
-        recv(new_conn_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
+        // recieving file metadata for positioning, name and size from client
+        int nrecv = 0;
+        while (nrecv<(sizeof(buffer)))
+            nrecv+=recv(new_conn_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
+        while (nrecv<(sizeof(buffer)+sizeof(uint)))
+            nrecv+=recv(new_conn_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
+        while (nrecv<(sizeof(buffer)+sizeof(uint)+sizeof(buffer)))
+            nrecv+=recv(new_conn_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
+        if (nrecv < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
+        {
+            perror("Meta_data not correct send \n");
+            exit(EXIT_FAILURE);
+        }
+
         printf("In register_server metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
 
         if(strcmp(meta_data.data_name,"register")==0)
         {
             int nrecv = 0;
             while (nrecv<sizeof(meta_data.data_size))
-                nrecv += recv(new_conn_fd, (void*)vcpu_register+nrecv, (sizeof(meta_data.data_size))-nrecv, 0);
+                nrecv += recv(new_conn_fd, (void*)((size_t)vcpu_register+nrecv), (sizeof(meta_data.data_size))-nrecv, 0);
             if (nrecv<(sizeof(meta_data.data_size)))
                 perror("Register recieved incomplete\n");
             else if (nrecv=(sizeof(meta_data.data_size)))
@@ -531,21 +575,25 @@ int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32
     strcpy(meta_data.data_position, comm_subtype);
     meta_data.data_size=(sizeof(*vcpu_register));
     //printf("((*ncores*sizeof(comm_register_t)) %d ,sizeof(*vcpu_register) %d\n", (*ncores*sizeof(comm_register_t)),sizeof(*vcpu_register) );
-    int nsent = send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
-    nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
-    nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
+    int nsent=0;
+    while (nsent<sizeof(buffer))
+        nsent += send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
+    while (nsent<(sizeof(buffer)+sizeof(uint)))    
+        nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
+    while (nsent<(sizeof(buffer)+sizeof(uint)+sizeof(buffer)))
+        nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
     if (nsent < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
         {
             perror("Meta_data not correct send \n");
             exit(EXIT_FAILURE);
-        } 
+        }
 
     
     //printf("Sending \n");
     nsent=0;
     while(nsent<(sizeof(*vcpu_register)))
     {
-        nsent += send(client_fd, (void*)vcpu_register+nsent, (sizeof(*vcpu_register))-nsent, 0);
+        nsent += send(client_fd, (void*)((size_t)vcpu_register+nsent), (sizeof(*vcpu_register))-nsent, 0);
     }
     if (nsent < (sizeof(*vcpu_register)))
         {
@@ -612,16 +660,25 @@ int comm_clock_server(struct kvm_clock_data *clock)
         }
         
         // recieving file metadata for positioning, name and size from client 
-        recv(new_conn_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
-        recv(new_conn_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
-        recv(new_conn_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
+        int nrecv = 0;
+        while (nrecv<(sizeof(buffer)))
+            nrecv+=recv(new_conn_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
+        while (nrecv<(sizeof(buffer)+sizeof(uint)))
+            nrecv+=recv(new_conn_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
+        while (nrecv<(sizeof(buffer)+sizeof(uint)+sizeof(buffer)))
+            nrecv+=recv(new_conn_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
+        if (nrecv < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
+        {
+            perror("Meta_data not correct send \n");
+            exit(EXIT_FAILURE);
+        }
         printf("In clock_server metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
 
         if (strcmp(meta_data.data_name,"clock")==0)
         {
             int nrecv = 0;
             while (nrecv<sizeof(clock))
-                nrecv += recv(new_conn_fd, (void*)&clock+nrecv, sizeof(clock)-nrecv, 0);
+                nrecv += recv(new_conn_fd,(void*)((size_t)clock+nrecv), sizeof(clock)-nrecv, 0);
             if (nrecv<(sizeof(clock)))
                 perror("Clock recieved incomplete\n");
             else if (nrecv=sizeof(clock))
@@ -679,20 +736,24 @@ int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_
     strcpy(meta_data.data_name, comm_type);
     strcpy(meta_data.data_position, comm_subtype);
     meta_data.data_size = (sizeof(clock));
-    int nsent = send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
-    nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
-    nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
+    int nsent=0;
+    while (nsent<sizeof(buffer))
+        nsent += send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
+    while (nsent<(sizeof(buffer)+sizeof(uint)))    
+        nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
+    while (nsent<(sizeof(buffer)+sizeof(uint)+sizeof(buffer)))
+        nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
     if (nsent < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
         {
             perror("Meta_data not correct send \n");
             exit(EXIT_FAILURE);
-        } 
+        }
 
     //printf("Sending \n");
     nsent=0;
     while(nsent<sizeof(clock))
     {
-        nsent += send(client_fd, (void*)clock+nsent, sizeof(clock)-nsent, 0);
+        nsent += send(client_fd, (void*)((size_t)clock+nsent), sizeof(clock)-nsent, 0);
     }
     if (nsent < (sizeof(clock)))
         {
@@ -761,9 +822,18 @@ int comm_chunk_server(uint8_t* mem)
         }
         
         // recieving file metadata for positioning, name and size from client 
-        recv(new_conn_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
-        recv(new_conn_fd, (void*)&meta_data.data_size, sizeof(unsigned long), 0);
-        recv(new_conn_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
+        int nrecv = 0;
+        while (nrecv<(sizeof(buffer)))
+            nrecv+=recv(new_conn_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
+        while (nrecv<(sizeof(buffer)+sizeof(uint)))
+            nrecv+=recv(new_conn_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
+        while (nrecv<(sizeof(buffer)+sizeof(uint)+sizeof(buffer)))
+            nrecv+=recv(new_conn_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
+        if (nrecv < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
+        {
+            perror("Meta_data not correct send \n");
+            exit(EXIT_FAILURE);
+        }
         printf("In chunk_server metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
 
         //printf("Sending \n");
@@ -771,25 +841,25 @@ int comm_chunk_server(uint8_t* mem)
         {         
             int nrecv1=0;
             while(nrecv1<sizeof(size_t))
-                nrecv1 += recv(new_conn_fd, (void*)&location+nrecv1, sizeof(size_t)-nrecv1, 0);
+                nrecv1 += recv(new_conn_fd, (void*)((size_t)location+nrecv1), sizeof(size_t)-nrecv1, 0);
             int nrecv2=0;
             while(nrecv2<sizeof(unsigned long))
-                nrecv2 += recv(new_conn_fd, (void*)&masksize+nrecv2, sizeof(unsigned long)-nrecv2, 0);
+                nrecv2 += recv(new_conn_fd, (void*)((size_t)masksize+nrecv2), sizeof(unsigned long)-nrecv2, 0);
             int nrecv3=0;
             if (meta_data.data_position=="PAGE_BITS")
             {
-            while(nrecv3<(1UL << PAGE_BITS))
-                nrecv3 += recv(new_conn_fd, (void*)(size_t*)(mem + (location & PAGE_MASK))+nrecv3, (1UL << PAGE_BITS)-nrecv3, 0);
+                while(nrecv3<(1UL << PAGE_BITS))
+                    nrecv3 += recv(new_conn_fd, (void*)(size_t*)(mem + (location & PAGE_MASK))+nrecv3, (1UL << PAGE_BITS)-nrecv3, 0);
             }
             else if (meta_data.data_position=="PAGE_2M_BITS")
             {
-            while(nrecv3<(1UL << PAGE_2M_BITS))
-                nrecv3 += recv(new_conn_fd, (void*)(size_t*)(mem + (location & PAGE_2M_MASK))+nrecv3, (1UL << PAGE_2M_BITS)-nrecv3, 0);
+                while(nrecv3<(1UL << PAGE_2M_BITS))
+                    nrecv3 += recv(new_conn_fd, (void*)(size_t*)(mem + (location & PAGE_2M_MASK))+nrecv3, (1UL << PAGE_2M_BITS)-nrecv3, 0);
             }
             else if (meta_data.data_position=="PAGE_SIZE")
             {
-            while(nrecv3<PAGE_SIZE)
-                nrecv3 += recv(new_conn_fd, (void*)(size_t*)(mem + location)+nrecv3, PAGE_SIZE-nrecv3, 0);
+                while(nrecv3<PAGE_SIZE)
+                    nrecv3 += recv(new_conn_fd, (void*)(size_t*)(mem + location)+nrecv3, PAGE_SIZE-nrecv3, 0);
             }
             if (nrecv3==PAGE_SIZE)
                 printf("Page_Size recv");
@@ -884,39 +954,43 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, unsigned long *masksiz
         meta_data.data_size = (sizeof(size_t)+sizeof(unsigned long)+(1UL << PAGE_2M_BITS));
     else if (meta_data.data_position=="PAGE_SIZE")
         meta_data.data_size = (sizeof(size_t)+sizeof(unsigned long)+PAGE_SIZE);
-    int nsent = send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
-    nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(unsigned long), 0);
-    nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
+    int nsent=0;
+    while (nsent<sizeof(buffer))
+        nsent += send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
+    while (nsent<(sizeof(buffer)+sizeof(uint)))    
+        nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(uint), 0);
+    while (nsent<(sizeof(buffer)+sizeof(uint)+sizeof(buffer)))
+        nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
     if (nsent < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
         {
             perror("Meta_data not correct send \n");
             exit(EXIT_FAILURE);
-        } 
+        }
 
     if(strcmp(meta_data.data_name,"mem")==0)
     {
     //printf("Sending \n");
     int nsent1=0;
         while(nsent1<sizeof(size_t))
-            nsent1 += send(client_fd, (void*)&pgdpgt+nsent1, sizeof(size_t)-nsent1, 0);
+            nsent1 += send(client_fd, (void*)((size_t)pgdpgt+nsent1), sizeof(size_t)-nsent1, 0);
         int nsent2=0;
         while(nsent2<(sizeof(unsigned long)))    
-            nsent2 += send(client_fd, (void*)&masksize+nsent2, sizeof(unsigned long)-nsent2, 0);
+            nsent2 += send(client_fd, (void*)((size_t)masksize+nsent2), sizeof(unsigned long)-nsent2, 0);
         int nsent3=0;
         if (meta_data.data_position=="PAGE_BITS")
         {
         while(nsent3<(1UL << PAGE_BITS))
-            nsent3 += send(client_fd, (void*)&mem_chunck+nsent3, (1UL << PAGE_BITS)-nsent3, 0);
+            nsent3 += send(client_fd, (void*)((size_t)mem_chunck+nsent3), (1UL << PAGE_BITS)-nsent3, 0);
         }
         else if (meta_data.data_position=="PAGE_2M_BITS")
         {
         while(nsent3<(1UL << PAGE_2M_BITS))
-            nsent3 += send(client_fd, (void*)&mem_chunck+nsent3, (1UL << PAGE_2M_BITS)-nsent3, 0);
+            nsent3 += send(client_fd, (void*)((size_t)mem_chunck+nsent3), (1UL << PAGE_2M_BITS)-nsent3, 0);
         }
         else if (meta_data.data_position=="PAGE_SIZE")
         {
         while(nsent3<PAGE_SIZE)
-            nsent3 += send(client_fd, (void*)&mem_chunck+nsent3, PAGE_SIZE-nsent3, 0);
+            nsent3 += send(client_fd, (void*)((size_t)mem_chunck+nsent3), PAGE_SIZE-nsent3, 0);
         }
         
 

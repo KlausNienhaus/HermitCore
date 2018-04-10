@@ -1204,6 +1204,7 @@ int uhyve_init(char *path)
 	FILE* f = fopen("checkpoint/chk_config.txt", "r");
 	if 	((hermit_check>0)&&(strncmp(comm_mode, "server", 6)==0))
 	{
+		restart = true;
 		comm_config_server(&config_struct);
 		ncores=config_struct.ncores;
 		guest_size=config_struct.guest_size;
@@ -1213,11 +1214,11 @@ int uhyve_init(char *path)
 		//comm_register_t vcpu_register[ncores];
 		if (comm_vcpu_register==NULL)
 			//comm_vcpu_register = vcpu_register;
-			comm_vcpu_register=calloc(ncores,sizeof(comm_register_t));
+			comm_vcpu_register = (comm_register_t*) calloc(ncores,sizeof(comm_register_t));
 		else if (sizeof(comm_vcpu_register)!=sizeof(comm_register_t)){
 			free(comm_vcpu_register);
 			//comm_vcpu_register = vcpu_register;
-			comm_vcpu_register=calloc(ncores,sizeof(comm_register_t));
+			comm_vcpu_register = (comm_register_t*) calloc(ncores,sizeof(comm_register_t));
 		}
 		comm_register_server(comm_vcpu_register, &cpuid, &ncores);
 		printf("\nIn uhyve_init recieved size *comm_vcpu_register %d sizeof((comm_vcpu_register+cpuid))%d\n",sizeof(*comm_vcpu_register),sizeof((comm_vcpu_register+cpuid)));
@@ -1451,12 +1452,12 @@ static void timer_handler(int signum)
 		comm_config_client(&checkpoint_config, comm_new_host, "config", "NULL");
 		if (comm_vcpu_register==NULL)
 			//comm_vcpu_register = vcpu_register;
-			comm_vcpu_register=calloc(ncores,sizeof(comm_register_t));
+			comm_vcpu_register=(comm_register_t*) calloc(ncores,sizeof(comm_register_t));
 		else if (sizeof(comm_vcpu_register)!=sizeof(comm_register_t)*ncores)
 		{
 			free(comm_vcpu_register);
 			//comm_vcpu_register = vcpu_register;
-			comm_vcpu_register=calloc(ncores,sizeof(comm_register_t));
+			comm_vcpu_register=(comm_register_t*) calloc(ncores,sizeof(comm_register_t));
 		}
 	}
 	//printf("after chk_config file\n");

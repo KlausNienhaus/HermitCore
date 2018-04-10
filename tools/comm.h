@@ -87,7 +87,6 @@ struct msr_data{
 
 
 typedef struct comm_register{
-	//msr_data_t mrs_data;
 	//struct kvm_msr_entry *msrs;
 	struct msr_data comm_msr_data;
 	struct kvm_regs regs;
@@ -98,8 +97,7 @@ typedef struct comm_register{
 	struct kvm_xcrs xcrs;
 	struct kvm_vcpu_events events;
 	struct kvm_mp_state mp_state;
-	//uint32_t no_checkpoint;
-	//uint32_t cpuid;
+
 }comm_register_t;
 
 typedef struct comm_config{
