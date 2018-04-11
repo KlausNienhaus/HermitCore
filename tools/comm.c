@@ -100,9 +100,29 @@ int commserver(void)
         }
         
         // recieving file metadata for positioning, name and size from client 
+        /*
         recv(new_conn_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
         recv(new_conn_fd, (void*)&meta_data.data_size, sizeof(int), 0);
         recv(new_conn_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
+        */
+        int total = 0;
+        int nrecv = 0;
+        while (nrecv<sizeof(buffer))
+            total+=nrecv+=recv(new_conn_fd, (void*)((char*)&meta_data.data_name)+nrecv, sizeof(buffer)-nrecv, 0);            
+        printf("nrecv %d total %d\n", nrecv, total);
+        nrecv = 0; 
+        while (nrecv<sizeof(uint))
+            total+=nrecv+=recv(new_conn_fd, (void*)((char*)&meta_data.data_size)+nrecv, sizeof(uint)-nrecv, 0);
+        printf("nrecv %d total %d\n", nrecv, total);
+        nrecv = 0; 
+        while (nrecv<sizeof(buffer))
+            total+=nrecv+=recv(new_conn_fd, (void*)((char*)&meta_data.data_position)+nrecv, sizeof(buffer)-nrecv, 0);
+        printf("nrecv %d total %d\n", nrecv, total);
+        if (total < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
+        {
+            perror("Meta_data not correct send \n");
+            exit(EXIT_FAILURE);
+        }
         printf("metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
 
        
@@ -232,13 +252,32 @@ int commclient(char *path, char *position, char *server_ip)
             printf("all checkpoint files send\n");
             meta_data.data_size=0;
             printf("metafilesize: %d to filename: %s and position: %s \n " , meta_data.data_size, meta_data.data_name, meta_data.data_position);
+            
+            /*
             int nsent = send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
             nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(int), 0);
             nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
-            if (nsent < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position))){
+            */
+
+            int total=0;
+            int nsent=0;
+            while (nsent<sizeof(buffer))
+                total += nsent += send(client_fd, (void*)((char*)&meta_data.data_name)+nsent, sizeof(buffer)-nsent,0);
+            //printf("nsent %d total %d\n", nsent, total);
+            nsent = 0;
+            while (nsent<sizeof(uint))    
+                total += nsent += send(client_fd, (void*)((char*)&meta_data.data_size)+nsent, sizeof(uint)-nsent, 0);
+            //printf("nsent %d total %d\n", nsent, total);
+            nsent = 0;
+            while (nsent<sizeof(buffer))
+                total +=nsent += send(client_fd, (void*)((char*)&meta_data.data_position)+nsent, sizeof(buffer)-nsent, 0);
+            //printf("nsent %d total %d\n", nsent, total);
+            if (total < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
+            {
                 perror("Meta_data not correct send \n");
-                return -1;
+                exit(EXIT_FAILURE);
             }
+
             return 0;
         } 
 
@@ -255,13 +294,31 @@ int commclient(char *path, char *position, char *server_ip)
    
     // sending file meta information to server before sending file
     printf("metafilesize: %d to filename: %s and position: %s \n " , meta_data.data_size, meta_data.data_name, meta_data.data_position);
+    
+    /*
     int nsent = send(client_fd, (void*)&meta_data.data_name, sizeof(buffer), 0);
     nsent += send(client_fd, (void*)&meta_data.data_size, sizeof(int), 0);
     nsent += send(client_fd, (void*)&meta_data.data_position, sizeof(buffer), 0);
-    if (nsent < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position))){
-            perror("Meta_data not correct send \n");
-            return -1;
-        } 
+    */
+    
+    int total=0;
+    int nsent=0;
+    while (nsent<sizeof(buffer))
+        total += nsent += send(client_fd, (void*)((char*)&meta_data.data_name)+nsent, sizeof(buffer)-nsent,0);
+    //printf("nsent %d total %d\n", nsent, total);
+    nsent = 0;
+    while (nsent<sizeof(uint))    
+        total += nsent += send(client_fd, (void*)((char*)&meta_data.data_size)+nsent, sizeof(uint)-nsent, 0);
+    //printf("nsent %d total %d\n", nsent, total);
+    nsent = 0;
+    while (nsent<sizeof(buffer))
+        total +=nsent += send(client_fd, (void*)((char*)&meta_data.data_position)+nsent, sizeof(buffer)-nsent, 0);
+    //printf("nsent %d total %d\n", nsent, total);
+    if (total < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
+    {
+        perror("Meta_data not correct send \n");
+        exit(EXIT_FAILURE);
+    }
 
         
     // read data from file and send it
