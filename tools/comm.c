@@ -598,13 +598,13 @@ int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32
         printf("Invalid address/ Address not supported \n");
         exit(EXIT_FAILURE);
     }
+
     // Connect to Server with assambeled information in struct serv_addr
     if (connect(client_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
     {
         printf("Connection Failed \n");
         exit(EXIT_FAILURE);
     }
-    
 
     //path in this case codes the type of transfer comming
     strcpy(meta_data.data_name, comm_type);
@@ -693,7 +693,7 @@ int comm_clock_server(struct kvm_clock_data *clock)
         perror("listen failed\n");
         exit(EXIT_FAILURE);
     }
-    //printf("waiting on connection by listen \n");
+    printf("clock_server waiting on connection by listen \n");
 
     while(1)
     {
@@ -727,13 +727,13 @@ int comm_clock_server(struct kvm_clock_data *clock)
         if (strcmp(meta_data.data_name,"clock")==0)
         {
             int nrecv = 0;
-            while (nrecv<sizeof(clock)){
-                nrecv += recv(new_conn_fd,(void*)((char*)clock)+nrecv, sizeof(clock)-nrecv, 0);
-                printf("In clock server nrecv %d sizeof(clock) %d\n", nrecv, sizeof(clock));
+            while (nrecv<sizeof(*clock)){
+                nrecv += recv(new_conn_fd,(void*)((char*)clock)+nrecv, sizeof(*clock)-nrecv, 0);
+                printf("In clock server nrecv %d sizeof(*clock) %d\n", nrecv, sizeof(*clock));
             }
-            if (nrecv<(sizeof(clock)))
+            if (nrecv<(sizeof(*clock)))
                 perror("Clock recieved incomplete\n");
-            else if (nrecv=sizeof(clock))
+            else if (nrecv=sizeof(*clock))
                 break;
         }
         else {
@@ -777,17 +777,22 @@ int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_
         printf("Invalid address/ Address not supported \n");
         exit(EXIT_FAILURE);
     }
+
+    //needed to be add as otherwise server hasn't socket open in time
+    sleep(1);
+
     // Connect to Server with assambeled information in struct serv_addr
     if (connect(client_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
     {
         printf("Connection Failed \n");
         exit(EXIT_FAILURE);
     }
-    
+    printf("clock_client connected\n");
+
     //data_name and data_position in this case codes the type of transfer comming for comm_server
     strcpy(meta_data.data_name, comm_type);
     strcpy(meta_data.data_position, comm_subtype);
-    meta_data.data_size = (sizeof(clock));
+    meta_data.data_size = (sizeof(*clock));
     int total=0;
     int nsent=0;
     while (nsent<sizeof(buffer))
@@ -809,12 +814,12 @@ int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_
 
     //printf("Sending \n");
     nsent=0;
-    while(nsent<sizeof(clock))
+    while(nsent<sizeof(*clock))
     {
-        nsent += send(client_fd, (void*)((char*)clock)+nsent, sizeof(clock)-nsent, 0);
-        printf("In Clock client nsent %d", nsent);
+        nsent += send(client_fd, (void*)((char*)clock)+nsent, sizeof(*clock)-nsent, 0);
+        printf("In Clock client nsent %d sizeof(*clock)\n", nsent, sizeof(*clock));
     }
-    if (nsent < (sizeof(clock)))
+    if (nsent < (sizeof(*clock)))
         {
             perror("Clock not correct send \n");
             exit(EXIT_FAILURE);
@@ -885,15 +890,15 @@ int comm_chunk_server(uint8_t* mem)
         int nrecv = 0;
         while (nrecv<sizeof(buffer))
             total+=nrecv+=recv(new_conn_fd, (void*)((char*)&meta_data.data_name)+nrecv, sizeof(buffer)-nrecv, 0);            
-        //printf("nrecv %d total %d\n", nrecv, total);
+        printf("nrecv %d total %d\n", nrecv, total);
         nrecv = 0; 
         while (nrecv<sizeof(uint))
             total+=nrecv+=recv(new_conn_fd, (void*)((char*)&meta_data.data_size)+nrecv, sizeof(uint)-nrecv, 0);
-        //printf("nrecv %d total %d\n", nrecv, total);
+        printf("nrecv %d total %d\n", nrecv, total);
         nrecv = 0; 
         while (nrecv<sizeof(buffer))
             total+=nrecv+=recv(new_conn_fd, (void*)((char*)&meta_data.data_position)+nrecv, sizeof(buffer)-nrecv, 0);
-        //printf("nrecv %d total %d\n", nrecv, total);
+        printf("nrecv %d total %d\n", nrecv, total);
         if (total < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
         {
             perror("Meta_data not correct send \n");
@@ -903,37 +908,46 @@ int comm_chunk_server(uint8_t* mem)
 
         //printf("Sending \n");
         if (strcmp(meta_data.data_name,"mem")==0)
-        {         
+        {
+            unsigned long chunk_size=0;         
             int nrecv1=0;
             while(nrecv1<sizeof(size_t))
                 nrecv1 += recv(new_conn_fd, (void*)((size_t)location+nrecv1), sizeof(size_t)-nrecv1, 0);
+            printf("nrecv1 %d sizeof(size_t) %d\n", nrecv1, sizeof(size_t));
             int nrecv2=0;
             while(nrecv2<sizeof(unsigned long))
                 nrecv2 += recv(new_conn_fd, (void*)((size_t)masksize+nrecv2), sizeof(unsigned long)-nrecv2, 0);
+            printf("nrecv2 %d sizeof(unsigned long) %d\n", nrecv1, sizeof(unsigned long));
             int nrecv3=0;
             if (meta_data.data_position=="PAGE_BITS")
             {
                 while(nrecv3<(1UL << PAGE_BITS))
                     nrecv3 += recv(new_conn_fd, (void*)(size_t*)(mem + (location & PAGE_MASK))+nrecv3, (1UL << PAGE_BITS)-nrecv3, 0);
+                printf("nrecv3 %d Page_Bits %d\n", nrecv3, (1UL << PAGE_BITS));
+                chunk_size=(1UL << PAGE_BITS);
             }
             else if (meta_data.data_position=="PAGE_2M_BITS")
             {
                 while(nrecv3<(1UL << PAGE_2M_BITS))
                     nrecv3 += recv(new_conn_fd, (void*)(size_t*)(mem + (location & PAGE_2M_MASK))+nrecv3, (1UL << PAGE_2M_BITS)-nrecv3, 0);
+                printf("nrecv3 %d Page_2M %d\n", nrecv3, (1UL << PAGE_2M_BITS));
+                chunk_size=(1UL << PAGE_2M_BITS);
             }
             else if (meta_data.data_position=="PAGE_SIZE")
             {
                 while(nrecv3<PAGE_SIZE)
                     nrecv3 += recv(new_conn_fd, (void*)(size_t*)(mem + location)+nrecv3, PAGE_SIZE-nrecv3, 0);
+                printf("nrecv3 %d Page_Size %d\n", nrecv3, (PAGE_SIZE));
+                chunk_size=PAGE_SIZE;
             }
             if (nrecv3==PAGE_SIZE)
-                printf("Page_Size recv");
+                printf("Page_Size recv\n");
             else if (nrecv3==(1UL << PAGE_2M_BITS))
-                printf("(1UL << PAGE_2M_BITS) recv");
+                printf("(1UL << PAGE_2M_BITS) recv\n");
             else if (nrecv3==(1UL << PAGE_BITS))
-                printf("(1UL << PAGE_BITS) recv");
+                printf("(1UL << PAGE_BITS) recv\n");
 
-            if ((nrecv1+nrecv2+nrecv3) < (meta_data.data_size))
+            if ((nrecv1+nrecv2+nrecv3) < (sizeof(size_t)+sizeof(unsigned long)+chunk_size))
             {
                 perror("Memory chunk not correct recieved \n");
                 //exit(EXIT_FAILURE);
@@ -1003,6 +1017,11 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, unsigned long *masksiz
         printf("Invalid address/ Address not supported \n");
         exit(EXIT_FAILURE);
     }
+
+    //needed to be add as otherwise server hasn't socket open in time
+    sleep(1);
+
+
     // Connect to Server with assambeled information in struct serv_addr
     if (connect(client_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
     {
@@ -1042,33 +1061,42 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, unsigned long *masksiz
     if(strcmp(meta_data.data_name,"mem")==0)
     {
     //printf("Sending \n");
+        unsigned long chunk_size=0;  
         int nsent1=0;
         while(nsent1<sizeof(size_t))
-            nsent1 += send(client_fd, (void*)((size_t)pgdpgt+nsent1), sizeof(size_t)-nsent1, 0);
+            nsent1 += send(client_fd, (void*)((size_t)pgdpgt)+nsent1, sizeof(size_t)-nsent1, 0);
+        printf("chunk_client nsent1 %d sizeof(size_t) %d\n", nsent1, sizeof(size_t));
         int nsent2=0;
         while(nsent2<(sizeof(unsigned long)))    
-            nsent2 += send(client_fd, (void*)((size_t)masksize+nsent2), sizeof(unsigned long)-nsent2, 0);
+            nsent2 += send(client_fd, (void*)((size_t)masksize)+nsent2, sizeof(unsigned long)-nsent2, 0);
+        printf("chunk_client nsent1 %d sizeof(unsigned long) %d\n", nsent2, sizeof(unsigned long));
         int nsent3=0;
         if (meta_data.data_position=="PAGE_BITS")
         {
         while(nsent3<(1UL << PAGE_BITS))
-            nsent3 += send(client_fd, (void*)((size_t)mem_chunck+nsent3), (1UL << PAGE_BITS)-nsent3, 0);
+            nsent3 += send(client_fd, (void*)((size_t)mem_chunck)+nsent3, (1UL << PAGE_BITS)-nsent3, 0);
+        printf("nsent3 %d Page_Bits %d\n", nsent3, (1UL << PAGE_BITS));
+        chunk_size=(1UL << PAGE_BITS);
         }
         else if (meta_data.data_position=="PAGE_2M_BITS")
         {
         while(nsent3<(1UL << PAGE_2M_BITS))
-            nsent3 += send(client_fd, (void*)((size_t)mem_chunck+nsent3), (1UL << PAGE_2M_BITS)-nsent3, 0);
+            nsent3 += send(client_fd, (void*)((size_t)mem_chunck)+nsent3, (1UL << PAGE_2M_BITS)-nsent3, 0);
+        printf("nsent3 %d Page_Size %d\n", nsent3, (PAGE_SIZE));
+        chunk_size=(1UL << PAGE_2M_BITS);
         }
         else if (meta_data.data_position=="PAGE_SIZE")
         {
         while(nsent3<PAGE_SIZE)
-            nsent3 += send(client_fd, (void*)((size_t)mem_chunck+nsent3), PAGE_SIZE-nsent3, 0);
+            nsent3 += send(client_fd, (void*)((size_t)mem_chunck)+nsent3, PAGE_SIZE-nsent3, 0);
+        printf("nsent3 %d Page_2M %d\n", nsent3, (1UL << PAGE_2M_BITS));
+        chunk_size=(1UL << PAGE_SIZE);
         }
         
 
-        if ((nsent1+nsent2+nsent3) < meta_data.data_size)
+        if ((nsent1+nsent2+nsent3) < (sizeof(size_t)+sizeof(unsigned long)+chunk_size))
             {
-                perror("Memory not correct send not correct send \n");
+                perror("Memory not correct send \n");
                 exit(EXIT_FAILURE);
             }
     }

@@ -492,7 +492,7 @@ static int load_checkpoint(uint8_t* mem, char* path)
 		if (fread(guest_mem, guest_size, 1, f) != 1)
 			err(1, "fread failed");
 #else
-		printf("In load_checkpoint comm_clock_server next\n");
+		printf("In load_checkpoint comm_chunk_server next\n");
 		if 	((hermit_check>0)&&(strncmp(comm_mode, "server", 6)==0))
 			comm_chunk_server(mem);
 		else{
@@ -1148,10 +1148,10 @@ static void save_cpu_state(void)
 		comm_vcpu_register[cpuid].mp_state=mp_state;
 		
 
-		printf("\nIn save_cpu_state to_send sizeof(sregs)+sizeof(regs)+sizeof(fpu)+sizeof(msr_data)+sizeof(lapic)+sizeof(xsave)+sizeof(xcrs)+sizeof(events)+sizeof(mp_state) %d \n", sizeof(sregs)+sizeof(regs)+sizeof(fpu)+sizeof(msr_data)+sizeof(lapic)+sizeof(xsave)+sizeof(xcrs)+sizeof(events)+sizeof(mp_state));
-		printf("\nIn save_cpu_state to_send sizeof *comm_vcpu_register %d sizeof(comm_vcpu_register[cpuid]) %d sizeof(comm_vcpu_register[cpuid].regs) %d,sizeof(sregs) %d \n",sizeof(*comm_vcpu_register),sizeof(comm_vcpu_register[cpuid]) ,sizeof(comm_vcpu_register[cpuid].regs),sizeof(regs));
-		printf("\nIn save_cpu_state to_send regs %d comm_vcpu_register[cpuid].regs %d lapic %d comm_vcpu_register[cpuid].lapic %d \n", regs, comm_vcpu_register[cpuid].regs, lapic ,comm_vcpu_register[cpuid].lapic);
-		printf("\nIn save_cpu_state to_send regs %d comm_vcpu_register[cpuid]->regs %d lapic %d comm_vcpu_register[cpuid]->lapic %d \n", regs, comm_vcpu_register[cpuid].regs, lapic ,comm_vcpu_register[cpuid].lapic);
+		//printf("In save_cpu_state to_send sizeof(sregs)+sizeof(regs)+sizeof(fpu)+sizeof(msr_data)+sizeof(lapic)+sizeof(xsave)+sizeof(xcrs)+sizeof(events)+sizeof(mp_state) %d \n", sizeof(sregs)+sizeof(regs)+sizeof(fpu)+sizeof(msr_data)+sizeof(lapic)+sizeof(xsave)+sizeof(xcrs)+sizeof(events)+sizeof(mp_state));
+		//printf("In save_cpu_state to_send sizeof *comm_vcpu_register %d sizeof(comm_vcpu_register[cpuid]) %d sizeof(comm_vcpu_register[cpuid].regs) %d,sizeof(sregs) %d \n",sizeof(*comm_vcpu_register),sizeof(comm_vcpu_register[cpuid]) ,sizeof(comm_vcpu_register[cpuid].regs),sizeof(regs));
+		printf("In save_cpu_state to_send regs %d comm_vcpu_register[cpuid].regs %d lapic %d comm_vcpu_register[cpuid].lapic %d \n", regs, comm_vcpu_register[cpuid].regs, lapic ,comm_vcpu_register[cpuid].lapic);
+		printf("In save_cpu_state to_send regs %d (comm_vcpu_register+cpuid)->regs %d lapic %d (comm_vcpu_register+cpuid)->lapic %d \n", regs, (comm_vcpu_register+cpuid)->regs, lapic ,(comm_vcpu_register+cpuid)->lapic);
 	}
 
 	fclose(f);
@@ -1232,8 +1232,8 @@ int uhyve_init(char *path)
 			comm_vcpu_register = (comm_register_t*) calloc(ncores,sizeof(comm_register_t));
 		}
 		comm_register_server(comm_vcpu_register, &cpuid, &ncores);
-		printf("\nIn uhyve_init recieved size *comm_vcpu_register %d sizeof((comm_vcpu_register+cpuid))%d\n",sizeof(*comm_vcpu_register),sizeof((comm_vcpu_register+cpuid)));
-		printf("\nIn uhyve_init recieved struct vcpu_register->regs %d comm_vcpu_register->lapic %d comm_vcpu_register[cpuid].regs %d comm_vcpu_register[cpuid].lapic %d \n", comm_vcpu_register[cpuid].regs, comm_vcpu_register[cpuid].lapic, comm_vcpu_register[0].regs, comm_vcpu_register[0].lapic);
+		printf("\nIn uhyve_init recieved sizeof(*comm_vcpu_register) %d cpuid %d\n",sizeof(*comm_vcpu_register),cpuid);
+		printf("\nIn uhyve_init recieved struct (comm_vcpu_register+cpuid)->regs %d (comm_vcpu_register+cpuid)->lapic %d comm_vcpu_register[cpuid].regs %d comm_vcpu_register[cpuid].lapic %d \n", (comm_vcpu_register+cpuid)->regs, (comm_vcpu_register+cpuid)->lapic, comm_vcpu_register[cpuid].regs, comm_vcpu_register[cpuid].lapic);
 	} else if (f != NULL) {
 		int tmp = 0;
 		restart = true;
@@ -1510,8 +1510,10 @@ static void timer_handler(int signum)
 	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
 	{
 		for(int i=0;i<ncores;i++)
-			printf("In timer_handler --- vcpu_register[cpuid].regs %d, vcpu_register[cpuid].lapic %d \n", comm_vcpu_register[i].regs, comm_vcpu_register[i].lapic);
-		comm_register_client(comm_vcpu_register, &cpuid, &ncores, comm_new_host, "register", "NULL");
+			printf("In timer_handler sending vcpu_register[cpuid].regs %d, vcpu_register[cpuid].lapic %d, (comm_vcpu_register+i)->regs , (comm_vcpu_register+i)->lapic\n", comm_vcpu_register[i].regs, comm_vcpu_register[i].lapic, (comm_vcpu_register+i)->regs, (comm_vcpu_register+i)->lapic);
+			comm_register_client(comm_vcpu_register, &cpuid, &ncores, comm_new_host, "register", "NULL");
+
+		
 	}
 
 	snprintf(fname, MAX_FNAME, "checkpoint/chk%u_mem.dat", no_checkpoint);
@@ -1531,8 +1533,9 @@ static void timer_handler(int signum)
 
 	struct kvm_clock_data clock = {};
 	kvm_ioctl(vmfd, KVM_GET_CLOCK, &clock);
+	printf("timer_hander sending clock over clock_client next\n");
 	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
-		comm_clock_client(&clock, comm_new_host, "memory", "clock");
+		comm_clock_client(&clock, comm_new_host, "clock", "NULL");
 	if (fwrite(&clock, sizeof(clock), 1, f) != 1)
 		err(1, "fwrite failed");
 
@@ -1623,6 +1626,7 @@ nextslot:
 								err(1, "fwrite failed");
 							if (fwrite((size_t*) (guest_mem + (pgt[l] & PAGE_MASK)), (1UL << PAGE_BITS), 1, f) != 1)
 								err(1, "fwrite failed");
+								printf("timer_hander sending mem_chunk page_bits chunk_client next\n");
 							if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
 								comm_chunk_client(&pgt_entry, (size_t*)(guest_mem + (pgt[l] & PAGE_MASK)), (unsigned long*)(1UL << PAGE_BITS), comm_new_host, "mem","PAGE_BITS");
 
@@ -1636,12 +1640,14 @@ nextslot:
 						err(1, "fwrite failed");
 					if (fwrite((size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), (1UL << PAGE_2M_BITS), 1, f) != 1)
 						err(1, "fwrite failed");
+						printf("timer_hander sending mem_chunk page_2M chunk_client next\n");
 					if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
 						comm_chunk_client(pgd+k, (size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), (unsigned long*)(1UL << PAGE_2M_BITS), comm_new_host, "mem","PAGE_2M_BITS");
 				}
 			}
 		}
 	}
+	printf("timer_hander sending mem_chunk finished chunk_client next\n");
 	comm_chunk_client(NULL, NULL, NULL, comm_new_host, "mem","finished");
 #endif
 
