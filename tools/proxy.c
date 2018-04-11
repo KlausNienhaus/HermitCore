@@ -1053,9 +1053,11 @@ int main(int argc, char **argv)
 	hermit_check = getenv("HERMIT_CHECKPOINT");
 	comm_mode = getenv("PROXY_COMM");
 
+
 	printf("PROXY_COMM is set to: %s\n",comm_mode);
 	if (comm_mode)
 	{
+		//sleep(10);
 		//printf("\nStarting in Server Mode \n");
 		//comm_server_ret = commserver();
 		if (strncmp(comm_mode, "server", 6) == 0) {
@@ -1074,7 +1076,7 @@ int main(int argc, char **argv)
 			//if (comm_client_ret<0) perror("commclient call failed");
 			
 		} else {
-			printf("\n Wrong Environmental Variable PROXY_COMM set\n it supports client and server supported atm\n", comm_mode);
+			printf("\n Wrong Environmental Variable PROXY_COMM set\n it supports client and server atm\n", comm_mode);
 		}
 	}
 	else

@@ -433,6 +433,7 @@ static int load_checkpoint(uint8_t* mem, char* path)
 	struct timeval begin, end;
 	uint32_t i;
 
+	printf("In load_checkpoint gettimeofday next\n");
 	if (verbose)
 		gettimeofday(&begin, NULL);
 
@@ -457,11 +458,15 @@ static int load_checkpoint(uint8_t* mem, char* path)
 	i = full_checkpoint ? no_checkpoint : 0;
 	for(; i<=no_checkpoint; i++)
 	{
+		FILE* f = NULL;
+		if 	((hermit_check>0)&&(!strncmp(comm_mode, "server", 6)==0)){
+		printf("In load_checkpoint name of data\n");
 		snprintf(fname, MAX_FNAME, "checkpoint/chk%u_mem.dat", i);
 
-		FILE* f = fopen(fname, "r");
+		f = fopen(fname, "r");
 		if (f == NULL)
 			return -1;
+		}
 
 		/*struct kvm_irqchip irqchip;
 		if (fread(&irqchip, sizeof(irqchip), 1, f) != 1)
@@ -470,6 +475,7 @@ static int load_checkpoint(uint8_t* mem, char* path)
 			kvm_ioctl(vmfd, KVM_SET_IRQCHIP, &irqchip);*/
 
 		struct kvm_clock_data clock;
+		printf("In load_checkpoint comm_clock_server next\n");
 		if 	((hermit_check>0)&&(strncmp(comm_mode, "server", 6)==0))
 			comm_clock_server(&clock);
 		else if (fread(&clock, sizeof(clock), 1, f) != 1)
@@ -486,6 +492,7 @@ static int load_checkpoint(uint8_t* mem, char* path)
 		if (fread(guest_mem, guest_size, 1, f) != 1)
 			err(1, "fread failed");
 #else
+		printf("In load_checkpoint comm_clock_server next\n");
 		if 	((hermit_check>0)&&(strncmp(comm_mode, "server", 6)==0))
 			comm_chunk_server(mem);
 		else{
@@ -1139,10 +1146,12 @@ static void save_cpu_state(void)
 		comm_vcpu_register[cpuid].xcrs=xcrs;
 		comm_vcpu_register[cpuid].events=events;
 		comm_vcpu_register[cpuid].mp_state=mp_state;
+		
+
 		printf("\nIn save_cpu_state to_send sizeof(sregs)+sizeof(regs)+sizeof(fpu)+sizeof(msr_data)+sizeof(lapic)+sizeof(xsave)+sizeof(xcrs)+sizeof(events)+sizeof(mp_state) %d \n", sizeof(sregs)+sizeof(regs)+sizeof(fpu)+sizeof(msr_data)+sizeof(lapic)+sizeof(xsave)+sizeof(xcrs)+sizeof(events)+sizeof(mp_state));
 		printf("\nIn save_cpu_state to_send sizeof *comm_vcpu_register %d sizeof(comm_vcpu_register[cpuid]) %d sizeof(comm_vcpu_register[cpuid].regs) %d,sizeof(sregs) %d \n",sizeof(*comm_vcpu_register),sizeof(comm_vcpu_register[cpuid]) ,sizeof(comm_vcpu_register[cpuid].regs),sizeof(regs));
-		printf("\nInsave_cpu_state to_send regs %d comm_vcpu_register[cpuid].regs %d lapic %d comm_vcpu_register[cpuid].lapic %d \n", regs, comm_vcpu_register[cpuid].regs, lapic ,comm_vcpu_register[cpuid].lapic);
-		printf("\nInsave_cpu_state to_send regs %d comm_vcpu_register[cpuid]->regs %d lapic %d comm_vcpu_register[cpuid]->lapic %d \n", regs, comm_vcpu_register[cpuid].regs, lapic ,comm_vcpu_register[cpuid].lapic);
+		printf("\nIn save_cpu_state to_send regs %d comm_vcpu_register[cpuid].regs %d lapic %d comm_vcpu_register[cpuid].lapic %d \n", regs, comm_vcpu_register[cpuid].regs, lapic ,comm_vcpu_register[cpuid].lapic);
+		printf("\nIn save_cpu_state to_send regs %d comm_vcpu_register[cpuid]->regs %d lapic %d comm_vcpu_register[cpuid]->lapic %d \n", regs, comm_vcpu_register[cpuid].regs, lapic ,comm_vcpu_register[cpuid].lapic);
 	}
 
 	fclose(f);
@@ -1211,6 +1220,8 @@ int uhyve_init(char *path)
 		no_checkpoint=config_struct.no_checkpoint;
 		elf_entry=config_struct.elf_entry;
 		full_checkpoint=config_struct.full_checkpoint;
+		printf("In uhyve_init checkpoint config ncores %d struct %d, guest_size %d struct %d, no_checkpoint %d struct %d, elf_entry %d struct %d, full_checkpoint %d struct %d\n", 
+		ncores, config_struct.ncores, guest_size, config_struct.guest_size, no_checkpoint, config_struct.no_checkpoint, elf_entry, config_struct.elf_entry, full_checkpoint, config_struct.full_checkpoint);
 		//comm_register_t vcpu_register[ncores];
 		if (comm_vcpu_register==NULL)
 			//comm_vcpu_register = vcpu_register;
@@ -1252,33 +1263,40 @@ int uhyve_init(char *path)
 			full_checkpoint = true;
 	}
 
+	printf("vcpu_threads calloc next\n");
 	vcpu_threads = (pthread_t*) calloc(ncores, sizeof(pthread_t));
 	if (!vcpu_threads)
 		err(1, "Not enough memory");
 
+	printf("vcpu_fds calloc next\n");
 	vcpu_fds = (int*) calloc(ncores, sizeof(int));
 	if (!vcpu_fds)
 		err(1, "Not enough memory");
 
+	printf("kvm open next\n");
 	kvm = open("/dev/kvm", O_RDWR | O_CLOEXEC);
 	if (kvm < 0)
 		err(1, "Could not open: /dev/kvm");
 
+	printf("kvm_api_version next\n");
 	/* Make sure we have the stable version of the API */
 	int kvm_api_version = kvm_ioctl(kvm, KVM_GET_API_VERSION, NULL);
 	if (kvm_api_version != 12)
 		err(1, "KVM: API version is %d, uhyve requires version 12", kvm_api_version);
 
+	printf("kvm_ioctl(kvm,kvm_kreate,0) next\n");
 	/* Create the virtual machine */
 	vmfd = kvm_ioctl(kvm, KVM_CREATE_VM, 0);
 
+	printf("ioctl(vmfd, KVM_CHECK_EXTENSION, KVM_CAP_SYNC_MMU) next\n");
 	uint64_t identity_base = 0xfffbc000;
 	if (ioctl(vmfd, KVM_CHECK_EXTENSION, KVM_CAP_SYNC_MMU) > 0) {
 		/* Allows up to 16M BIOSes. */
 		identity_base = 0xfeffc000;
-
+		
 		kvm_ioctl(vmfd, KVM_SET_IDENTITY_MAP_ADDR, &identity_base);
 	}
+	printf("kvm_ioctl(vmfd, KVM_SET_TSS_ADDR, identity_base + 0x1000)next\n");
 	kvm_ioctl(vmfd, KVM_SET_TSS_ADDR, identity_base + 0x1000);
 
 	/*
@@ -1286,12 +1304,15 @@ int uhyve_init(char *path)
 	 *
 	 * TODO: support of huge pages
 	 */
+	
 	if (guest_size < KVM_32BIT_GAP_START) {
+		printf("mmap < 32Bit Gab next\n");
 		guest_mem = mmap(NULL, guest_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 		if (guest_mem == MAP_FAILED)
 			err(1, "mmap failed");
 	} else {
 		guest_size += KVM_32BIT_GAP_SIZE;
+		printf("mmap >= 32Bit Gab next\n");
 		guest_mem = mmap(NULL, guest_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 		if (guest_mem == MAP_FAILED)
 			err(1, "mmap failed");
@@ -1299,9 +1320,11 @@ int uhyve_init(char *path)
 		/*
 		 * We mprotect the gap PROT_NONE so that if we accidently write to it, we will know.
 		 */
+		printf("mprotect(guest_mem next\n");
 		mprotect(guest_mem + KVM_32BIT_GAP_START, KVM_32BIT_GAP_SIZE, PROT_NONE);
 	}
 
+	printf("merge HERMIT_MERGEABLE next\n");
 	const char* merge = getenv("HERMIT_MERGEABLE");
 	if (merge && (strcmp(merge, "0") != 0)) {
 		/*
@@ -1309,11 +1332,12 @@ int uhyve_init(char *path)
 		 * many instances of the same data (e.g., virtualization systems
 		 * such as KVM). It can consume a lot of processing power!
 		 */
+		printf("madvise next\n");
 		madvise(guest_mem, guest_size, MADV_MERGEABLE);
 		if (verbose)
 			fprintf(stderr, "VM uses KSN feature \"mergeable\" to reduce the memory footprint.\n");
 	}
-
+	printf("struct kvm_userspace next\n");
 	struct kvm_userspace_memory_region kvm_region = {
 		.slot = 0,
 		.guest_phys_addr = GUEST_OFFSET,
@@ -1326,18 +1350,23 @@ int uhyve_init(char *path)
 #endif
 	};
 
+
 	if (guest_size <= KVM_32BIT_GAP_START - GUEST_OFFSET) {
+		printf("kvm_ioctl set_user_mem <32bit Gap next\n");
 		kvm_ioctl(vmfd, KVM_SET_USER_MEMORY_REGION, &kvm_region);
 	} else {
 		kvm_region.memory_size = KVM_32BIT_GAP_START - GUEST_OFFSET;
+		printf("kvm_ioctl set_user_mem >= 32bit Gap next\n");
 		kvm_ioctl(vmfd, KVM_SET_USER_MEMORY_REGION, &kvm_region);
 
 		kvm_region.slot = 1;
 		kvm_region.guest_phys_addr = KVM_32BIT_GAP_START+KVM_32BIT_GAP_SIZE;
 		kvm_region.memory_size = guest_size - KVM_32BIT_GAP_SIZE - KVM_32BIT_GAP_START + GUEST_OFFSET;
+		printf("kvm_ioctl set_user_mem 2nd call for >32bit Gab next\n");
 		kvm_ioctl(vmfd, KVM_SET_USER_MEMORY_REGION, &kvm_region);
 	}
 
+	printf("kvm_ioctl(vmfd, KVM_CREATE_IRQCHIP, NULL) next\n");
 	kvm_ioctl(vmfd, KVM_CREATE_IRQCHIP, NULL);
 
 #ifdef KVM_CAP_X2APIC_API
@@ -1347,9 +1376,10 @@ int uhyve_init(char *path)
 		.flags = 0,
 		.args[0] = KVM_X2APIC_API_USE_32BIT_IDS|KVM_X2APIC_API_DISABLE_BROADCAST_QUIRK,
 	};
+	printf("kvm_ioctl(vmfd, KVM_ENABLE_CAP, &cap) next\n");
 	kvm_ioctl(vmfd, KVM_ENABLE_CAP, &cap);
 #endif
-
+	printf("kvm_ioctl(vmfd, KVM_GET_IRQCHIP, &chip) next\n");
 	// initialited IOAPIC with HermitCore's default settings
 	struct kvm_irqchip chip;
 	chip.chip_id = KVM_IRQCHIP_IOAPIC;
@@ -1365,6 +1395,7 @@ int uhyve_init(char *path)
 		chip.chip.ioapic.redirtbl[i].fields.mask = i != 2 ? 0 : 1;
 		chip.chip.ioapic.redirtbl[i].fields.dest_id = 0;
 	}
+	printf("kvm_ioctl(vmfd, KVM_SET_IRQCHIP, &chip) next\n");
 	kvm_ioctl(vmfd, KVM_SET_IRQCHIP, &chip);
 
 	// try to detect KVM extensions
@@ -1381,7 +1412,9 @@ int uhyve_init(char *path)
 	//if (cap_vapic)
 	//	printf("System supports vapic\n");
 
+	
 	if (restart) {
+		printf("load_checkpoint next\n");
 		if (load_checkpoint(guest_mem, path) != 0)
 			exit(EXIT_FAILURE);
 	} else {
@@ -1421,6 +1454,31 @@ static void timer_handler(int signum)
 	if (stat("checkpoint", &st) == -1)
 		mkdir("checkpoint", 0700);
 
+
+	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
+	{
+		comm_config_t checkpoint_config;
+		checkpoint_config.ncores=ncores;
+		checkpoint_config.guest_size=guest_size;
+		checkpoint_config.no_checkpoint=no_checkpoint;
+		checkpoint_config.elf_entry=elf_entry;
+		checkpoint_config.full_checkpoint=full_checkpoint;
+		printf("In timer_handler checkpoint config ncores %d struct %d, guest_size %d struct %d, no_checkpoint %d struct %d, elf_entry %d struct %d, full_checkpoint %d struct %d\n", 
+		ncores, checkpoint_config.ncores, guest_size, checkpoint_config.guest_size, no_checkpoint, checkpoint_config.no_checkpoint, elf_entry, checkpoint_config.elf_entry, full_checkpoint, checkpoint_config.full_checkpoint);
+		//comm_register_t vcpu_register[ncores];
+		
+		comm_config_client(&checkpoint_config, comm_new_host, "config", "NULL");
+		if (comm_vcpu_register==NULL)
+			//comm_vcpu_register = vcpu_register;
+			comm_vcpu_register = (comm_register_t*) calloc(ncores,sizeof(comm_register_t));
+		else if (sizeof(comm_vcpu_register)!=sizeof(comm_register_t)*ncores)
+		{
+			free(comm_vcpu_register);
+			//comm_vcpu_register = vcpu_register;
+			comm_vcpu_register = (comm_register_t*) calloc(ncores,sizeof(comm_register_t));
+		}
+	}
+
 	// update configuration file
 	FILE* f = fopen("checkpoint/chk_config.txt", "w");
 	if (f == NULL) {
@@ -1439,28 +1497,7 @@ static void timer_handler(int signum)
 
 	fclose(f);
 
-	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
-	{
-		comm_config_t checkpoint_config;
-		checkpoint_config.ncores=ncores;
-		checkpoint_config.guest_size=guest_size;
-		checkpoint_config.no_checkpoint=no_checkpoint;
-		checkpoint_config.elf_entry=elf_entry;
-		//printf("before sending to server vcpu_register[cpuid].regs %d, vcpu_register[cpuid].lapic %d \n", comm_vcpu_register[i].regs, comm_vcpu_register[i].lapic);
-		checkpoint_config.full_checkpoint=full_checkpoint;
-		//comm_register_t vcpu_register[ncores];
-		comm_config_client(&checkpoint_config, comm_new_host, "config", "NULL");
-		if (comm_vcpu_register==NULL)
-			//comm_vcpu_register = vcpu_register;
-			comm_vcpu_register=(comm_register_t*) calloc(ncores,sizeof(comm_register_t));
-		else if (sizeof(comm_vcpu_register)!=sizeof(comm_register_t)*ncores)
-		{
-			free(comm_vcpu_register);
-			//comm_vcpu_register = vcpu_register;
-			comm_vcpu_register=(comm_register_t*) calloc(ncores,sizeof(comm_register_t));
-		}
-	}
-	//printf("after chk_config file\n");
+
 
 	for(size_t i = 0; i < ncores; i++)
 		if (vcpu_threads[i] != pthread_self())
@@ -1473,7 +1510,7 @@ static void timer_handler(int signum)
 	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
 	{
 		for(int i=0;i<ncores;i++)
-			printf("before sending to server vcpu_register[cpuid].regs %d, vcpu_register[cpuid].lapic %d \n", comm_vcpu_register[i].regs, comm_vcpu_register[i].lapic);
+			printf("In timer_handler --- vcpu_register[cpuid].regs %d, vcpu_register[cpuid].lapic %d \n", comm_vcpu_register[i].regs, comm_vcpu_register[i].lapic);
 		comm_register_client(comm_vcpu_register, &cpuid, &ncores, comm_new_host, "register", "NULL");
 	}
 
