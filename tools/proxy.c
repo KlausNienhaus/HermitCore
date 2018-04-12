@@ -1057,7 +1057,7 @@ int main(int argc, char **argv)
 	printf("PROXY_COMM is set to: %s\n",comm_mode);
 	if (comm_mode)
 	{
-		sleep(15);
+		//sleep(15);
 		//printf("\nStarting in Server Mode \n");
 		//comm_server_ret = commserver();
 		if (strncmp(comm_mode, "server", 6) == 0) {

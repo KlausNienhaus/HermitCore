@@ -124,6 +124,6 @@ int comm_clock_server(struct kvm_clock_data *clock);
 int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_type, char *comm_subtype);
 
 int comm_chunk_server(uint8_t *mem);
-int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, unsigned long *masksize, char *server_ip, char *comm_type, char *comm_subtype);
+int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char *comm_type, char *comm_subtype);
 
 #endif
