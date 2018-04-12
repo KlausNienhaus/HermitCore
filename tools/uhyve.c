@@ -494,7 +494,7 @@ static int load_checkpoint(uint8_t* mem, char* path)
 #else
 		printf("In load_checkpoint comm_chunk_server next\n");
 		if 	((hermit_check>0)&&(strncmp(comm_mode, "server", 6)==0))
-			comm_chunk_server(mem);
+			comm_chunk_server(&mem);
 		else{
 			while (fread(&location, sizeof(location), 1, f) == 1) {
 				//printf("location 0x%zx\n", location);
@@ -1511,7 +1511,7 @@ static void timer_handler(int signum)
 	{
 		for(int i=0;i<ncores;i++)
 			printf("In timer_handler sending vcpu_register[cpuid].regs %d, vcpu_register[cpuid].lapic %d, (comm_vcpu_register+i)->regs , (comm_vcpu_register+i)->lapic\n", comm_vcpu_register[i].regs, comm_vcpu_register[i].lapic, (comm_vcpu_register+i)->regs, (comm_vcpu_register+i)->lapic);
-			comm_register_client(comm_vcpu_register, &cpuid, &ncores, comm_new_host, "register", "NULL");
+		comm_register_client(comm_vcpu_register, &cpuid, &ncores, comm_new_host, "register", "NULL");
 
 		
 	}
