@@ -385,7 +385,7 @@ int comm_config_server(comm_config_t *checkpoint_config)
     }
     //printf("In config_server checkpoint config ncores %d guest_size %d no_checkpoint %d elf_entry %d full_checkpoint %d \n", 
 	//   checkpoint_config->ncores, checkpoint_config->guest_size, checkpoint_config->no_checkpoint, checkpoint_config->elf_entry, checkpoint_config->full_checkpoint);
-    //printf("Config for migration recieved\n");
+    printf("Config for migration recieved\n");
     close(server_fd);
     return 0;
 }
@@ -562,12 +562,11 @@ int comm_register_server(comm_register_t *vcpu_register, uint32_t *cpuid, uint32
     }
     //printf("In comm_register_server recieved size %d vcpu_register->regs %d cpu_register->lapic %d\n",sizeof(*vcpu_register),vcpu_register->regs, vcpu_register->lapic);
     //printf("In comm_register_server recieved size %d vcpu_register[*cpuid].regs %d vcpu_register[*cpuid].lapic %d\n", vcpu_register[*cpuid].regs, vcpu_register[*cpuid].lapic);
+    printf("Register for migration recieved\n");
     close(server_fd);
     return 0;
 }
 
-// struct kvm_sregs *sregs, struct kvm_regs *regs, struct kvm_fpu *fpu, struct msr_data *msr_data, struct kvm_lapic_state *lapic,
-// struct kvm_xsave *xsave, struct kvm_xcrs *xcrs, struct kvm_vcpu_events *events, struct kvm_mp_state *mp_state
 
 //@brief:   Comm function for sending VCPU register for checkpoint transfer
 //          atm sends data file to server (e.g. checkpoint)
@@ -722,7 +721,7 @@ int comm_clock_server(struct kvm_clock_data *clock)
             perror("Meta_data not correct send \n");
             exit(EXIT_FAILURE);
         }
-        printf("In clock_server metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
+        //printf("In clock_server metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
 
         if (strcmp(meta_data.data_name,"clock")==0)
         {
@@ -824,24 +823,22 @@ int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_
             perror("Clock not correct send \n");
             exit(EXIT_FAILURE);
         } 
-   
+    
     close(client_fd);
     return 0;
 }
 
-//TODO: adding loop for all tables until all mem tables are recieved
-//size_t *pgdpgt, size_t *mem_chunck, unsigned long *masksize
 
+//@brief: recieves memory_chunks until all parts have been recieved and are aligned back together to a bigger memory image
 int comm_chunk_server(uint8_t* mem)
 {
     int server_fd, new_conn_fd; //data_size;
     struct sockaddr_in address;
     int opt = 1, filesrecv = 0, addrlen = sizeof(address);
     char buffer[1024]= {0};
-    size_t location, memorypart=0;
-    
+    size_t location;
+    size_t memorypart=0;
     //unsigned long masksize;
-
     comm_socket_header_t meta_data = {0};
 
 
@@ -965,7 +962,7 @@ int comm_chunk_server(uint8_t* mem)
     }
           
 
-    printf("Memory for migration recieved\n");
+    printf("Memory for migration recieved returning to loading process\n");
     close(server_fd);
     return 0;
 }

@@ -1675,6 +1675,7 @@ int uhyve_loop(void)
 	unsetenv("PROXY_COMM");
 	hermit_check = getenv("HERMIT_CHECKPOINT");
 	comm_mode = getenv("PROXY_COMM");
+	checkpoint_recieved=false;
 	}
 
 	if (hermit_check)
