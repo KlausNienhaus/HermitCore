@@ -195,6 +195,7 @@ static char *comm_mode = NULL; // = getenv("PROXY_COMM"); at program start
 //test_t (*test_array_ptr)[];
 comm_register_t *comm_vcpu_register = NULL;
 static char *comm_new_host = "127.0.0.1";
+static char *comm_next_host = "127.0.0.1";
 static bool checkpoint_recieved = false;
 
 static uint64_t memparse(const char *ptr)
@@ -784,7 +785,9 @@ static int vcpu_loop(void)
 	int ret;
 
 	if (restart) {
-		pthread_barrier_wait(&barrier);
+
+
+
 		if (cpuid == 0)
 			no_checkpoint++;
 	}
@@ -1113,30 +1116,6 @@ static void save_cpu_state(void)
 
 	snprintf(fname, MAX_FNAME, "checkpoint/chk%u_core%u.dat", no_checkpoint, cpuid);
 
-	FILE* f = fopen(fname, "w");
-	if (f == NULL) {
-		err(1, "fopen: unable to open file\n");
-	}
-
-	if (fwrite(&sregs, sizeof(sregs), 1, f) != 1)
-		err(1, "fwrite failed\n");
-	if (fwrite(&regs, sizeof(regs), 1, f) != 1)
-		err(1, "fwrite failed\n");
-	if (fwrite(&fpu, sizeof(fpu), 1, f) != 1)
-		err(1, "fwrite failed\n");
-	if (fwrite(&msr_data, sizeof(msr_data), 1, f) != 1)
-		err(1, "fwrite failed\n");
-	if (fwrite(&lapic, sizeof(lapic), 1, f) != 1)
-		err(1, "fwrite failed\n");
-	if (fwrite(&xsave, sizeof(xsave), 1, f) != 1)
-		err(1, "fwrite failed\n");
-	if (fwrite(&xcrs, sizeof(xcrs), 1, f) != 1)
-		err(1, "fwrite failed\n");
-	if (fwrite(&events, sizeof(events), 1, f) != 1)
-		err(1, "fwrite failed\n");
-	if (fwrite(&mp_state, sizeof(mp_state), 1, f) != 1)
-		err(1, "fwrite failed\n");
-
 	//&sregs, &regs, &fpu, &msr_data, &lapic, &xsave, &xcrs, &events, &mp_state
 	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
 	{
@@ -1156,9 +1135,34 @@ static void save_cpu_state(void)
 		//printf("In save_cpu_state to_send sizeof *comm_vcpu_register %d sizeof(comm_vcpu_register[cpuid]) %d sizeof(comm_vcpu_register[cpuid].regs) %d,sizeof(sregs) %d \n",sizeof(*comm_vcpu_register),sizeof(comm_vcpu_register[cpuid]) ,sizeof(comm_vcpu_register[cpuid].regs),sizeof(regs));
 		//printf("In save_cpu_state to_send regs %d comm_vcpu_register[cpuid].regs %d lapic %d comm_vcpu_register[cpuid].lapic %d \n", regs, comm_vcpu_register[cpuid].regs, lapic ,comm_vcpu_register[cpuid].lapic);
 		//printf("In save_cpu_state to_send regs %d (comm_vcpu_register+cpuid)->regs %d lapic %d (comm_vcpu_register+cpuid)->lapic %d \n", regs, (comm_vcpu_register+cpuid)->regs, lapic ,(comm_vcpu_register+cpuid)->lapic);
-	}
+	}else{
 
-	fclose(f);
+		FILE* f = fopen(fname, "w");
+		if (f == NULL) {
+			err(1, "fopen: unable to open file\n");
+		}
+
+		if (fwrite(&sregs, sizeof(sregs), 1, f) != 1)
+			err(1, "fwrite failed\n");
+		if (fwrite(&regs, sizeof(regs), 1, f) != 1)
+			err(1, "fwrite failed\n");
+		if (fwrite(&fpu, sizeof(fpu), 1, f) != 1)
+			err(1, "fwrite failed\n");
+		if (fwrite(&msr_data, sizeof(msr_data), 1, f) != 1)
+			err(1, "fwrite failed\n");
+		if (fwrite(&lapic, sizeof(lapic), 1, f) != 1)
+			err(1, "fwrite failed\n");
+		if (fwrite(&xsave, sizeof(xsave), 1, f) != 1)
+			err(1, "fwrite failed\n");
+		if (fwrite(&xcrs, sizeof(xcrs), 1, f) != 1)
+			err(1, "fwrite failed\n");
+		if (fwrite(&events, sizeof(events), 1, f) != 1)
+			err(1, "fwrite failed\n");
+		if (fwrite(&mp_state, sizeof(mp_state), 1, f) != 1)
+			err(1, "fwrite failed\n");
+
+		fclose(f);
+	}
 }
 
 static void sigusr_handler(int signum)
@@ -1434,6 +1438,7 @@ static void timer_handler(int signum)
 	const size_t flag = (!full_checkpoint && (no_checkpoint > 0)) ? PG_DIRTY : PG_ACCESSED;
 	char fname[MAX_FNAME];
 	struct timeval begin, end;
+	FILE* f = NULL;
 
 	if (verbose)
 		gettimeofday(&begin, NULL);
@@ -1464,10 +1469,9 @@ static void timer_handler(int signum)
 			//comm_vcpu_register = vcpu_register;
 			comm_vcpu_register = (comm_register_t*) calloc(ncores,sizeof(comm_register_t));
 		}
-	}
-
+	}else{
 	// update configuration file
-	FILE* f = fopen("checkpoint/chk_config.txt", "w");
+	f = fopen("checkpoint/chk_config.txt", "w");
 	if (f == NULL) {
 		err(1, "fopen: unable to open file");
 	}
@@ -1482,7 +1486,7 @@ static void timer_handler(int signum)
 		fprintf(f, "full checkpoint: 0");
 
 	fclose(f);
-
+	}
 
 
 	for(size_t i = 0; i < ncores; i++)
@@ -1500,15 +1504,13 @@ static void timer_handler(int signum)
 		comm_register_client(comm_vcpu_register, &cpuid, &ncores, comm_new_host, "register", "NULL");
 
 		
+	}else{	//((hermit_check>0)&&!(strncmp(comm_mode, "client", 6)==0))
+		snprintf(fname, MAX_FNAME, "checkpoint/chk%u_mem.dat", no_checkpoint);
+		f = fopen(fname, "w");
+		if (f == NULL) {
+			err(1, "fopen: unable to open file");
 	}
-
-	snprintf(fname, MAX_FNAME, "checkpoint/chk%u_mem.dat", no_checkpoint);
-
-	f = fopen(fname, "w");
-	if (f == NULL) {
-		err(1, "fopen: unable to open file");
 	}
-
 	/*struct kvm_irqchip irqchip = {};
 	if (cap_irqchip)
 		kvm_ioctl(vmfd, KVM_GET_IRQCHIP, &irqchip);
@@ -1522,9 +1524,10 @@ static void timer_handler(int signum)
 	//printf("timer_hander sending clock over clock_client next\n");
 	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
 		comm_clock_client(&clock, comm_new_host, "clock", "NULL");
-	if (fwrite(&clock, sizeof(clock), 1, f) != 1)
-		err(1, "fwrite failed");
-
+	else{
+		if (fwrite(&clock, sizeof(clock), 1, f) != 1)
+			err(1, "fwrite failed");
+	}
 
 #if 0
 	if (fwrite(guest_mem, guest_size, 1, f) != 1)
@@ -1565,18 +1568,21 @@ nextslot:
 				if ((value & test) == test)
 				{
 					size_t addr = (i*sizeof(size_t)*8+j)*PAGE_SIZE;
-
-					if (fwrite(&addr, sizeof(size_t), 1, f) != 1)
-						err(1, "fwrite failed");
-					if (fwrite((size_t*) (guest_mem + addr), PAGE_SIZE, 1, f) != 1)
-						err(1, "fwrite failed");
 					if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
 						comm_chunk_client(&addr, (size_t*) (guest_mem + addr), comm_new_host, "mem","PAGE_SIZE");
+					else{
+						if (fwrite(&addr, sizeof(size_t), 1, f) != 1)
+							err(1, "fwrite failed");
+						if (fwrite((size_t*) (guest_mem + addr), PAGE_SIZE, 1, f) != 1)
+							err(1, "fwrite failed");
+					}
+					
 				}
 			}
 		}
 	}
-	comm_chunk_client(NULL, NULL, NULL, comm_new_host, "mem","finished");
+	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
+		comm_chunk_client(NULL, NULL, NULL, comm_new_host, "mem","finished");
 
 	// do we have to check the second slot?
 	if ((dlog.slot == 0) && (guest_size > KVM_32BIT_GAP_START - GUEST_OFFSET)) {
@@ -1608,13 +1614,15 @@ nextslot:
 							if (!full_checkpoint)
 								pgt[l] = pgt[l] & ~(PG_DIRTY|PG_ACCESSED);
 							size_t pgt_entry = pgt[l] & ~PG_PSE; // because PAT use the same bit as PSE
-							if (fwrite(&pgt_entry, sizeof(size_t), 1, f) != 1)
-								err(1, "fwrite failed");
-							if (fwrite((size_t*) (guest_mem + (pgt[l] & PAGE_MASK)), (1UL << PAGE_BITS), 1, f) != 1)
-								err(1, "fwrite failed");
 								//printf("timer_hander sending mem_chunk page_bits chunk_client next\n");
 							if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
 								comm_chunk_client(&pgt_entry, (size_t*)(guest_mem + (pgt[l] & PAGE_MASK)), comm_new_host, "mem","PAGE_BITS");
+							else{
+								if (fwrite(&pgt_entry, sizeof(size_t), 1, f) != 1)
+									err(1, "fwrite failed");
+								if (fwrite((size_t*) (guest_mem + (pgt[l] & PAGE_MASK)), (1UL << PAGE_BITS), 1, f) != 1)
+									err(1, "fwrite failed");
+							}
 
 						}
 					}
@@ -1622,22 +1630,25 @@ nextslot:
 					//printf("\t\t*pgd[%zd] 0x%zx, 2MB\n", k, pgd[k] & ~PG_XD);
 					if (!full_checkpoint)
 						pgd[k] = pgd[k] & ~(PG_DIRTY|PG_ACCESSED);
-					if (fwrite(pgd+k, sizeof(size_t), 1, f) != 1)
-						err(1, "fwrite failed");
-					if (fwrite((size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), (1UL << PAGE_2M_BITS), 1, f) != 1)
-						err(1, "fwrite failed");
 						//printf("timer_hander sending mem_chunk page_2M chunk_client next\n");
 					if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
 						comm_chunk_client(pgd+k, (size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), comm_new_host, "mem","PAGE_2M_BITS");
+					else{
+						if (fwrite(pgd+k, sizeof(size_t), 1, f) != 1)
+							err(1, "fwrite failed");
+						if (fwrite((size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), (1UL << PAGE_2M_BITS), 1, f) != 1)
+							err(1, "fwrite failed");
+					}
 				}
 			}
 		}
 	}
 	//printf("timer_hander sending mem_chunk finished chunk_client next\n");
-	comm_chunk_client(NULL, NULL, comm_new_host, "mem","finished");
+	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0))
+		comm_chunk_client(NULL, NULL, comm_new_host, "mem","finished");
 #endif
-
-	fclose(f);
+	if 	((hermit_check>0)&&!(strncmp(comm_mode, "client", 6)==0))
+		fclose(f);
 
 	pthread_barrier_wait(&barrier);
 
@@ -1655,8 +1666,6 @@ nextslot:
 		//commclient("checkpoint/chk_config.txt","checkpoint",comm_new_host);
 		//commclient("checkpoint/chk0_core0.dat","checkpoint",comm_new_host);
 		//commclient("checkpoint/chk0_mem.dat","checkpoint",comm_new_host);
-		//free(comm_vcpu_register);
-		//comm_vcpu_register = NULL;
 		printf("Client transfered checkpoint and stops execution now\n");
 		//setenv("HERMIT_CHECKPOINT",0,1);
 		//unsetenv("PROXY_COMM");
@@ -1669,14 +1678,26 @@ int uhyve_loop(void)
 {
 	int ts = 0;
 
-	if (checkpoint_recieved)
-	{
-	setenv("HERMIT_CHECKPOINT","0",1);
-	unsetenv("PROXY_COMM");
-	hermit_check = getenv("HERMIT_CHECKPOINT");
-	comm_mode = getenv("PROXY_COMM");
-	checkpoint_recieved=false;
+	printf("comm_mode %s\n", comm_mode);
+	printf("hermit_check %s\n", hermit_check);
+	pthread_barrier_wait(&barrier);
+	char* loop = getenv("LOOP");
+	printf("loop %s\n", loop);
+	if (checkpoint_recieved && loop){
+		setenv("HERMIT_CHECKPOINT","5",1);
+		setenv("PROXY_COMM","client",1);
+		hermit_check = getenv("HERMIT_CHECKPOINT");
+		comm_mode = "client";
+		checkpoint_recieved=false;
+	}else if(checkpoint_recieved && !loop){
+		setenv("HERMIT_CHECKPOINT","0",1);
+		unsetenv("PROXY_COMM");
+		hermit_check = getenv("HERMIT_CHECKPOINT");
+		comm_mode = getenv("PROXY_COMM");
+		checkpoint_recieved=false;
 	}
+	printf("comm_mode %s\n", comm_mode);
+	printf("hermit_check %s\n", hermit_check);
 
 	if (hermit_check)
 		ts = atoi(hermit_check);
