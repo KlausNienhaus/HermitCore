@@ -32,37 +32,54 @@
 #include <errno.h>
 #include <signal.h>
 #include <time.h>
+#include <hermit/syscall.h>
+#include <assert.h>
+#include <malloc.h>
 
+#ifndef SIZE
+#define SIZE    1*1024*1024
+#endif 
 
 int main(int argc, char** argv)
 {
+    //uint64_t memory_size = *argv[argc-1];
+    int zaehler_sleeps = 0;
+    uint16_t no_mb = 250;
+    /*if(argc < 2) {
+		no_mb = *argv[1];
+        printf("argv[1] %d, *argv[1] %d", argv[1], *argv[1]);
+	}else{
+        printf("no arguments passed");
+    }*/
 
-    clock_t begin = clock();
-    clock_t end = 0;
-    double CPUtime_spent_in_app = 0;
-    time_t now;
-    int ZaehlerSleeps = 0;
+    char (*memory) [no_mb*SIZE] = malloc(sizeof(*memory));
+    printf("charsize %d, int8_t size %d", sizeof(char), sizeof(int8_t));
+    
+    if (memory) 
+        memset(memory, 1, sizeof(*memory));
+    else
+        perror("malloc() failed");
 
+    char* comm = getenv("PROXY_COMM");
+    printf("proxy comm %d \n", comm);
+
+    malloc_stats();
 
 /*   @brief Run Infintie Loop to test Checkpointing by looking at:
  *  local time differences, process time difference and loop iteration count */
-    while (ZaehlerSleeps<10)
+    while (zaehler_sleeps<100)
     {
-        time(&now);
-	    printf("before sleep: %d : %d \n", gettimeofday(&begin, NULL), now);
+        //printf("argv[1] %d, *argv[1] %d, sizeof(memory) %d", argv[1], *argv[1], sizeof(memory));
         
-        sys_msleep(10000);
+        sys_msleep(1000);
         
-        ZaehlerSleeps++;
-        
-        now = time(0);
-	    printf("after sleep: %d : %d\n", gettimeofday(&begin, NULL), now);
+        zaehler_sleeps++;
 
-        end = clock();
-        CPUtime_spent_in_app = (double)(end - begin) / CLOCKS_PER_SEC;
-        printf("Clocktime in Loop %d : %d : %d\n", ZaehlerSleeps, gettimeofday(&begin, NULL), end);
+        printf("Loop Number %d sizeof(*memory) %d\n", zaehler_sleeps, sizeof(*memory));
     }
     
+    free(memory);
+    //*memory = NULL;
 
 	return 0;
 }

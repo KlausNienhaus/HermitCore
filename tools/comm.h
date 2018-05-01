@@ -103,7 +103,7 @@ typedef struct comm_register{
 typedef struct comm_config{
 	uint32_t 	ncores; 
 	size_t		guest_size; 
-	uint32_t 	no_checkpoint; 
+	//uint32_t 	no_checkpoint; 
 	uint64_t 	elf_entry; 
 	bool 		full_checkpoint;
 }comm_config_t;
