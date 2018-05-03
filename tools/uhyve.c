@@ -191,12 +191,12 @@ static __thread uint32_t cpuid = 0;
 
 static char *hermit_check = NULL; // = getenv("HERMIT_CHECKPOINT"); at program start
 static char *comm_mode = NULL; // = getenv("PROXY_COMM"); at program start
-//comm_register_t (*comm_vcpu_register)[];
-//test_t (*test_array_ptr)[];
-comm_register_t *comm_vcpu_register = NULL;
 static char *comm_new_host = "xxx.xxx.xxx.xxx";
 static char *comm_old_host = "xxx.xxx.xxx.xxx";
 static bool checkpoint_recieved = false;
+comm_register_t *comm_vcpu_register = NULL;
+
+static uint8_t* dummy = NULL;
 
 static uint64_t memparse(const char *ptr)
 {
@@ -479,7 +479,7 @@ static int load_checkpoint(uint8_t* mem, char* path)
 
 		struct kvm_clock_data clock;
 		//printf("In load_checkpoint comm_clock_server next\n");
-		if 	(strncmp(comm_mode, "server", 6)==0 && !hermit_check)
+		if 	(strncmp(comm_mode, "server", 6)==0 && !(hermit_check>0))
 			comm_clock_server(&clock);
 		else if (fread(&clock, sizeof(clock), 1, f) != 1)
 			err(1, "fread failed");
@@ -497,7 +497,7 @@ static int load_checkpoint(uint8_t* mem, char* path)
 			err(1, "fread failed");
 #else
 		//printf("In load_checkpoint comm_chunk_server next\n");
-		if 	(strncmp(comm_mode, "server", 6)==0 && !hermit_check){
+		if 	(strncmp(comm_mode, "server", 6)==0 && !(hermit_check>0)){
 			comm_chunk_server(mem);
 			checkpoint_recieved=true;
 			}
@@ -786,9 +786,7 @@ static int vcpu_loop(void)
 	int ret;
 
 	if (restart) {
-
-
-
+		comm_chunk_client(NULL, NULL, comm_old_host, "mem","finished");
 		if (cpuid == 0)
 			no_checkpoint++;
 	}
@@ -1117,8 +1115,7 @@ static void save_cpu_state(void)
 	snprintf(fname, MAX_FNAME, "checkpoint/chk%u_core%u.dat", no_checkpoint, cpuid);
 
 	//&sregs, &regs, &fpu, &msr_data, &lapic, &xsave, &xcrs, &events, &mp_state
-	if 	(strncmp(comm_mode, "client", 6)==0)
-	{
+	if 	(strncmp(comm_mode, "client", 6)==0){
 		//comm_vcpu_register[cpuid].msrs=comm_vcpu_register[cpuid].msr_data.entries;
 		comm_vcpu_register[cpuid].sregs=sregs;
 		comm_vcpu_register[cpuid].regs=regs;
@@ -1129,9 +1126,8 @@ static void save_cpu_state(void)
 		comm_vcpu_register[cpuid].xcrs=xcrs;
 		comm_vcpu_register[cpuid].events=events;
 		comm_vcpu_register[cpuid].mp_state=mp_state;
-		
-
-	}else{
+	}
+	if (hermit_check>0){
 
 		FILE* f = fopen(fname, "w");
 		if (f == NULL) {
@@ -1225,7 +1221,7 @@ int uhyve_init(char *path)
 	atexit(uhyve_atexit);
 
 	FILE* f = fopen("checkpoint/chk_config.txt", "r");
-	if 	(strncmp(comm_mode, "server", 6)==0 && !hermit_check)
+	if 	((strncmp(comm_mode, "server", 6)==0) && (!(hermit_check>0)))
 	{
 		restart = true;
 		comm_config_server(&config_struct);
@@ -1243,21 +1239,22 @@ int uhyve_init(char *path)
 			comm_vcpu_register = (comm_register_t*) calloc(ncores,sizeof(comm_register_t));
 		}
 		comm_register_server(comm_vcpu_register, &cpuid, &ncores);
-	} else if (f != NULL) {
+	} else if ((strncmp(comm_mode, "server", 6)==0) && (hermit_check)){
+		if (f != NULL) {
 			int tmp = 0;
 			restart = true;
 
 			fscanf(f, "number of cores: %u\n", &ncores);
 			fscanf(f, "memory size: 0x%zx\n", &guest_size);
 			fscanf(f, "checkpoint number: %u\n", &no_checkpoint);
-			fscanf(f, "entry point: 0x%zx", &elf_entry);
+			fscanf(f, "entry point: 0x%zx\n", &elf_entry);
 			fscanf(f, "full checkpoint: %d", &tmp);
 			full_checkpoint = tmp ? true : false;
 
 			if (verbose)
 				fprintf(stderr, "Restart from checkpoint %u (ncores %d, mem size 0x%zx)\n", no_checkpoint, ncores, guest_size);
 			fclose(f);
-		
+		}
 	} else {
 		const char* hermit_memory = getenv("HERMIT_MEM");
 		if (hermit_memory)
@@ -1282,7 +1279,7 @@ int uhyve_init(char *path)
 	if (!vcpu_fds)
 		err(1, "Not enough memory");
 
-	
+
 	kvm = open("/dev/kvm", O_RDWR | O_CLOEXEC);
 	if (kvm < 0)
 		err(1, "Could not open: /dev/kvm");
@@ -1442,7 +1439,7 @@ static void timer_handler(int signum)
 	struct timeval begin, end;
 	FILE* f = NULL;
 
-	printf("signum: %d\n", signum);
+	//printf("signum: %d\n", signum);
 
 	if (verbose)
 		gettimeofday(&begin, NULL);
@@ -1451,7 +1448,7 @@ static void timer_handler(int signum)
 		mkdir("checkpoint", 0700);
 
 
-	if 	(strncmp(comm_mode, "client", 6)==0 && !hermit_check)
+	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
 	{
 		comm_config_t checkpoint_config;
 		checkpoint_config.ncores=ncores;
@@ -1471,7 +1468,8 @@ static void timer_handler(int signum)
 			//comm_vcpu_register = vcpu_register;
 			comm_vcpu_register = (comm_register_t*) calloc(ncores,sizeof(comm_register_t));
 		}
-	}else{
+	}
+	if (hermit_check>0){
 	// update configuration file
 	f = fopen("checkpoint/chk_config.txt", "w");
 	if (f == NULL) {
@@ -1499,14 +1497,15 @@ static void timer_handler(int signum)
 
 	save_cpu_state();
 
-	if (strncmp(comm_mode, "client", 6)==0 && !hermit_check)
+	if (strncmp(comm_mode, "client", 6)==0 && signum==10)
 	{
 		//for(int i=0;i<ncores;i++)
 			//printf("In timer_handler sending vcpu_register[cpuid].regs %d, vcpu_register[cpuid].lapic %d, (comm_vcpu_register+i)->regs , (comm_vcpu_register+i)->lapic\n", comm_vcpu_register[i].regs, comm_vcpu_register[i].lapic, (comm_vcpu_register+i)->regs, (comm_vcpu_register+i)->lapic);
 		comm_register_client(comm_vcpu_register, &cpuid, &ncores, comm_new_host, "register", "NULL");
 
 		
-	} else {	//((hermit_check>0)&&!(strncmp(comm_mode, "client", 6)==0))
+	}
+	if (hermit_check>0){	//((hermit_check>0)&&!(strncmp(comm_mode, "client", 6)==0))
 		snprintf(fname, MAX_FNAME, "checkpoint/chk%u_mem.dat", no_checkpoint);
 		f = fopen(fname, "w");
 		if (f == NULL) {
@@ -1524,9 +1523,9 @@ static void timer_handler(int signum)
 	struct kvm_clock_data clock = {};
 	kvm_ioctl(vmfd, KVM_GET_CLOCK, &clock);
 	//printf("timer_hander sending clock over clock_client next\n");
-	if 	(strncmp(comm_mode, "client", 6)==0 && !hermit_check)
+	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
 		comm_clock_client(&clock, comm_new_host, "clock", "NULL");
-	else{
+	if (hermit_check>0){
 		if (fwrite(&clock, sizeof(clock), 1, f) != 1)
 			err(1, "fwrite failed");
 	}
@@ -1570,9 +1569,9 @@ nextslot:
 				if ((value & test) == test)
 				{
 					size_t addr = (i*sizeof(size_t)*8+j)*PAGE_SIZE;
-					if 	(strncmp(comm_mode, "client", 6)==0 && !hermit_check)
+					if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
 						comm_chunk_client(&addr, (size_t*) (guest_mem + addr), comm_new_host, "mem","PAGE_SIZE");
-					else{
+					if (hermit_check>0){
 						if (fwrite(&addr, sizeof(size_t), 1, f) != 1)
 							err(1, "fwrite failed");
 						if (fwrite((size_t*) (guest_mem + addr), PAGE_SIZE, 1, f) != 1)
@@ -1591,7 +1590,7 @@ nextslot:
 		memset(dlog.dirty_bitmap, 0x00, dirty_log_size * sizeof(size_t));
 		goto nextslot;
 	}
-	if 	(strncmp(comm_mode, "client", 6)==0 && !hermit_check)
+	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
 		comm_chunk_client(NULL, NULL, NULL, comm_new_host, "mem","finished");
 #else
 	size_t* pml4 = (size_t*) (guest_mem+elf_entry+PAGE_SIZE);
@@ -1618,9 +1617,9 @@ nextslot:
 								pgt[l] = pgt[l] & ~(PG_DIRTY|PG_ACCESSED);
 							size_t pgt_entry = pgt[l] & ~PG_PSE; // because PAT use the same bit as PSE
 								//printf("timer_hander sending mem_chunk page_bits chunk_client next\n");
-							if 	(strncmp(comm_mode, "client", 6)==0 && !hermit_check)
+							if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
 								comm_chunk_client(&pgt_entry, (size_t*)(guest_mem + (pgt[l] & PAGE_MASK)), comm_new_host, "mem","PAGE_BITS");
-							else{
+							if (hermit_check>0){
 								if (fwrite(&pgt_entry, sizeof(size_t), 1, f) != 1)
 									err(1, "fwrite failed");
 								if (fwrite((size_t*) (guest_mem + (pgt[l] & PAGE_MASK)), (1UL << PAGE_BITS), 1, f) != 1)
@@ -1634,9 +1633,9 @@ nextslot:
 					if (!full_checkpoint)
 						pgd[k] = pgd[k] & ~(PG_DIRTY|PG_ACCESSED);
 						//printf("timer_hander sending mem_chunk page_2M chunk_client next\n");
-					if 	(strncmp(comm_mode, "client", 6)==0 && !hermit_check)
+					if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
 						comm_chunk_client(pgd+k, (size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), comm_new_host, "mem","PAGE_2M_BITS");
-					else{
+					if (hermit_check>0){
 						if (fwrite(pgd+k, sizeof(size_t), 1, f) != 1)
 							err(1, "fwrite failed");
 						if (fwrite((size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), (1UL << PAGE_2M_BITS), 1, f) != 1)
@@ -1647,7 +1646,7 @@ nextslot:
 		}
 	}
 	//printf("timer_hander sending mem_chunk finished chunk_client next\n");
-	if 	(strncmp(comm_mode, "client", 6)==0 && !hermit_check)
+	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
 		comm_chunk_client(NULL, NULL, comm_new_host, "mem","finished");
 #endif
 	if 	(hermit_check>0)
@@ -1666,6 +1665,9 @@ nextslot:
 
 	if 	(strncmp(comm_mode, "client", 6)==0)
 	{
+		
+		//uint8_t dummy = NULL;
+		comm_chunk_server(dummy);
 		//commclient("checkpoint/chk_config.txt","checkpoint",comm_new_host);
 		//commclient("checkpoint/chk0_core0.dat","checkpoint",comm_new_host);
 		//commclient("checkpoint/chk0_mem.dat","checkpoint",comm_new_host);

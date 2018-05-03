@@ -42,26 +42,16 @@
 
 int main(int argc, char** argv)
 {
-    //uint64_t memory_size = *argv[argc-1];
     int zaehler_sleeps = 0;
     uint16_t no_mb = 250;
-    /*if(argc < 2) {
-		no_mb = *argv[1];
-        printf("argv[1] %d, *argv[1] %d", argv[1], *argv[1]);
-	}else{
-        printf("no arguments passed");
-    }*/
-
     char (*memory) [no_mb*SIZE] = malloc(sizeof(*memory));
-    printf("charsize %d, int8_t size %d", sizeof(char), sizeof(int8_t));
+
     
     if (memory) 
         memset(memory, 1, sizeof(*memory));
     else
         perror("malloc() failed");
 
-    char* comm = getenv("PROXY_COMM");
-    printf("proxy comm %d \n", comm);
 
     malloc_stats();
 
@@ -69,7 +59,6 @@ int main(int argc, char** argv)
  *  local time differences, process time difference and loop iteration count */
     while (zaehler_sleeps<100)
     {
-        //printf("argv[1] %d, *argv[1] %d, sizeof(memory) %d", argv[1], *argv[1], sizeof(memory));
         
         sys_msleep(1000);
         
