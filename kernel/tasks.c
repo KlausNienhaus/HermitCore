@@ -903,3 +903,27 @@ void reschedule(void)
 		switch_context(stack);
 	irq_nested_enable(flags);
 }
+
+static spinlock_irqsave_t malloc_lock = SPINLOCK_IRQSAVE_INIT;
+
+void __sys_malloc_lock(void)
+{
+	spinlock_irqsave_lock(&malloc_lock);
+}
+
+void __sys_malloc_unlock(void)
+{
+	spinlock_irqsave_unlock(&malloc_lock);
+}
+
+static spinlock_irqsave_t env_lock = SPINLOCK_IRQSAVE_INIT;
+
+void __sys_env_lock(void)
+{
+	spinlock_irqsave_lock(&env_lock);
+}
+
+void __sys_env_unlock(void)
+{
+	spinlock_irqsave_unlock(&env_lock);
+}

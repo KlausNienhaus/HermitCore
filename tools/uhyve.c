@@ -190,6 +190,8 @@ static pthread_barrier_t barrier;
 
 const char* hermit_check = NULL; //getenv("HERMIT_CHECKPOINT");
 const char* comm_mode = NULL; //getenv("PROXY_COMM");
+static char *comm_new_host = "xxx.xxx.xxx.xxx";
+static char *comm_old_host = "xxx.xxx.xxx.xxx";
 
 static __thread struct kvm_run *run = NULL;
 static __thread int vcpufd = -1;
@@ -764,6 +766,13 @@ static int vcpu_loop(void)
 
 	if (restart) {
 		pthread_barrier_wait(&barrier);
+		if (strcmp(comm_mode,"server")==0){
+		commclient("finished", "checkpoint", comm_old_host);
+		comm_mode="client";
+		setenv("PROXY_COMM","client",1);
+		const char* test = getenv("PROXY_COMM");
+		//printf("PROXY_COMM %s\n", test);
+		}
 		if (cpuid == 0)
 			no_checkpoint++;
 	}
@@ -1157,6 +1166,14 @@ int uhyve_init(char *path)
 		commserver();
 	}
 
+	comm_new_host = getenv("COMM_DEST");
+	if(!comm_new_host)
+		comm_new_host = "127.0.0.1";
+	comm_old_host = getenv("COMM_ORIGIN");
+	if(!comm_old_host)
+		comm_old_host = "127.0.0.1";
+
+	
 	char* v = getenv("HERMIT_VERBOSE");
 	if (v && (strcmp(v, "0") != 0))
 		verbose = true;
@@ -1357,8 +1374,8 @@ static void timer_handler(int signum)
 	const size_t flag = (!full_checkpoint && (no_checkpoint > 0)) ? PG_DIRTY : PG_ACCESSED;
 	char fname[MAX_FNAME];
 	struct timeval begin, end;
-	const char* hermit_check = getenv("HERMIT_CHECKPOINT");
-	const char* comm_mode = getenv("PROXY_COMM");
+	//hermit_check = getenv("HERMIT_CHECKPOINT");
+	//comm_mode = getenv("PROXY_COMM");
 
 	if (verbose)
 		gettimeofday(&begin, NULL);
@@ -1533,22 +1550,23 @@ nextslot:
 
 	if 	(((hermit_check>0)||(signum==10))&&(strncmp(comm_mode, "client", 6)==0)){
 		//printf("before commclient calls\n");
-		commclient("checkpoint/chk_config.txt", "checkpoint", "127.0.0.1");
+		commclient("checkpoint/chk_config.txt", "checkpoint", comm_new_host);
 		for (int j=0; j<no_checkpoint;j++){
 			for(int i=0; i<ncores; i++){
 				char core_files[256];
 				sprintf(core_files, "checkpoint/chk%d_core%d.dat", (no_checkpoint-1), (ncores-1));
 				//printf(core_files);
-				commclient(core_files, "checkpoint", "127.0.0.1");
+				commclient(core_files, "checkpoint", comm_new_host);
 			}
 		}
 		for (int j=0; j<no_checkpoint;j++){
 				char mem_files[256];
 				sprintf(mem_files, "checkpoint/chk%d_mem.dat", (no_checkpoint-1));
 				//printf(mem_files);
-				commclient(mem_files, "checkpoint", "127.0.0.1");
+				commclient(mem_files, "checkpoint", comm_new_host);
 			}
-		commclient("finished", "checkpoint", "127.0.0.1");
+		commclient("finished", "checkpoint", comm_new_host);
+		commserver();
 		printf("Client transfered checkpoint and stops execution now\n");
 		sigterm_handler(SIGTERM);
 	}
@@ -1558,7 +1576,7 @@ nextslot:
 int uhyve_loop(void)
 {
 	struct sigaction sa;
-	const char* hermit_check = getenv("HERMIT_CHECKPOINT");
+	//const char* hermit_check = getenv("HERMIT_CHECKPOINT");
 	int ts = 0;
 
 	if (hermit_check)
