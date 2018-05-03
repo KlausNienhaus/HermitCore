@@ -1053,8 +1053,8 @@ int main(int argc, char **argv)
 	if (comm_mode)
 	{
 		if (strncmp(comm_mode, "server", 6) == 0) {
-			printf("\nStarting in Server Mode \n");
-			comm_server_ret = commserver();
+			//printf("\nStarting in Server Mode \n");
+			//comm_server_ret = commserver();
 			//if (comm_server_ret<0) 
 			//	perror("commclient call failed");
 		} else if (strncmp(comm_mode, "client", 6) == 0) {

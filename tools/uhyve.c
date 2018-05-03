@@ -187,6 +187,10 @@ static int kvm = -1, vmfd = -1, netfd = -1, efd = -1;
 static uint32_t no_checkpoint = 0;
 static pthread_mutex_t kvm_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_barrier_t barrier;
+
+const char* hermit_check = NULL; //getenv("HERMIT_CHECKPOINT");
+const char* comm_mode = NULL; //getenv("PROXY_COMM");
+
 static __thread struct kvm_run *run = NULL;
 static __thread int vcpufd = -1;
 static __thread uint32_t cpuid = 0;
@@ -1146,6 +1150,13 @@ void sigterm_handler(int signum)
 
 int uhyve_init(char *path)
 {
+	hermit_check = getenv("HERMIT_CHECKPOINT");
+	comm_mode = getenv("PROXY_COMM");
+	if (strncmp(comm_mode, "server", 6) == 0) {
+		printf("\nStarting in Server Mode \n");
+		commserver();
+	}
+
 	char* v = getenv("HERMIT_VERBOSE");
 	if (v && (strcmp(v, "0") != 0))
 		verbose = true;
@@ -1520,7 +1531,7 @@ nextslot:
 
 	no_checkpoint++;
 
-	if 	((hermit_check>0)&&(strncmp(comm_mode, "client", 6)==0)){
+	if 	(((hermit_check>0)||(signum==10))&&(strncmp(comm_mode, "client", 6)==0)){
 		//printf("before commclient calls\n");
 		commclient("checkpoint/chk_config.txt", "checkpoint", "127.0.0.1");
 		for (int j=0; j<no_checkpoint;j++){
@@ -1546,6 +1557,7 @@ nextslot:
 
 int uhyve_loop(void)
 {
+	struct sigaction sa;
 	const char* hermit_check = getenv("HERMIT_CHECKPOINT");
 	int ts = 0;
 
@@ -1562,9 +1574,13 @@ int uhyve_loop(void)
 	for(size_t i = 1; i < ncores; i++)
 		pthread_create(&vcpu_threads[i], NULL, uhyve_thread, (void*) i);
 
+	/* Install timer_handler as the signal handler for SIGUSR1 for migration initialisation. */
+	memset(&sa, 0x00, sizeof(sa));
+	sa.sa_handler = &timer_handler;
+	sigaction(SIGUSR1, &sa, NULL);	
+
 	if (ts > 0)
 	{
-		struct sigaction sa;
 		struct itimerval timer;
 
 		/* Install timer_handler as the signal handler for SIGVTALRM. */

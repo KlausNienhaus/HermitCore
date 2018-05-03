@@ -46,6 +46,9 @@
 
 #define PORT 3490
 
+#define maxtry 50
+#define retytime 500
+
 //@brief:   Server side C function for TCP Socket Connections 
 //          atm recieves data file from client (e.g. checkpoint)
 int commserver(void)
@@ -109,15 +112,15 @@ int commserver(void)
         int nrecv = 0;
         while (nrecv<sizeof(buffer))
             total+=nrecv+=recv(new_conn_fd, (void*)((char*)&meta_data.data_name)+nrecv, sizeof(buffer)-nrecv, 0);            
-        printf("nrecv %d total %d\n", nrecv, total);
+        //printf("nrecv %d total %d\n", nrecv, total);
         nrecv = 0; 
         while (nrecv<sizeof(uint))
             total+=nrecv+=recv(new_conn_fd, (void*)((char*)&meta_data.data_size)+nrecv, sizeof(uint)-nrecv, 0);
-        printf("nrecv %d total %d\n", nrecv, total);
+        //printf("nrecv %d total %d\n", nrecv, total);
         nrecv = 0; 
         while (nrecv<sizeof(buffer))
             total+=nrecv+=recv(new_conn_fd, (void*)((char*)&meta_data.data_position)+nrecv, sizeof(buffer)-nrecv, 0);
-        printf("nrecv %d total %d\n", nrecv, total);
+        //printf("nrecv %d total %d\n", nrecv, total);
         if (total < (sizeof(meta_data.data_name)+sizeof(meta_data.data_size)+sizeof(meta_data.data_position)))
         {
             perror("Meta_data not correct send \n");
@@ -125,9 +128,10 @@ int commserver(void)
         }
         printf("metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
 
-       
+        
         if (stat(meta_data.data_position, &st) == -1)
 		    mkdir(meta_data.data_position, 0700);
+        
 
         if (strcmp(meta_data.data_name,"finished")==0) {
             printf("recieved all checkpoint files starting up system\n");
@@ -146,7 +150,13 @@ int commserver(void)
         {
             // first read file in chunks of buffer bytes
             int recv_writen = 0;
+            //int valrecv = 0;
             int valrecv = recv(new_conn_fd , buffer, sizeof(buffer), 0);
+            /*while (valrecv > 0){
+                valrecv = 0;
+                valrecv += recv(new_conn_fd , buffer, sizeof(buffer), 0);
+                recv_writen += fwrite(buffer, sizeof(char), valrecv, fp);
+            }*/
             //printf("Bytes recieved %d \n", valrecv);        
             // if recv was success, write data to file.
             if(valrecv > 0){
@@ -154,7 +164,7 @@ int commserver(void)
                 recv_writen += fwrite(buffer, sizeof(char), valrecv, fp);
             }
 
-            
+            //printf("Bytes writen %d \n", recv_writen);  
             // checking if everything was recieved or something is missing and an error occured 
             if (valrecv < sizeof(buffer)){
                 fseek(fp, 0, SEEK_END); // seek to end of file
@@ -181,11 +191,11 @@ int commserver(void)
                 
                 break;
             }
+    
         }
 
         printf("finished file transfer closing socket and waiting for new connection\n");
         close(new_conn_fd);
-        sleep(1);
     }
 
     close(server_fd);
@@ -234,10 +244,19 @@ int commclient(char *path, char *position, char *server_ip)
         printf("\nInvalid address/ Address not supported \n");
         return -1;
     }
+    
+    //needed to be add as otherwise server hasn't socket open in time
+    int try=0;
+    retry:
     // Connect to Server with assambeled information in struct serv_addr
     if (connect(client_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0){
-        printf("\nConnection Failed \n");
-        return -1;
+        if (try<maxtry){
+                usleep(retytime);
+                try++;
+                goto retry;
+            }   
+        printf("Connection Failed in memory chunk client\n");
+        exit(EXIT_FAILURE);
     }
 
 
