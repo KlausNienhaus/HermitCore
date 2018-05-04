@@ -33,7 +33,7 @@
 
 
 #define maxtry 50
-#define retytime 50
+#define retytime 10
 //static uint8_t *guest_mem = NULL;
 //size_t* pgt;
 
@@ -855,7 +855,7 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char 
     }
 
     //needed to be add as otherwise server hasn't socket open in time
-    usleep(2);
+    usleep(1);
     int try=0;
     retry4:
     // Connect to Server with assambeled information in struct serv_addr

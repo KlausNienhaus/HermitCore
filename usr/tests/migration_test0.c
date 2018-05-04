@@ -65,10 +65,10 @@ int main(int argc, char** argv)
         
         zaehler_sleeps++;
 
-        printf("Loop Number %d sizeof(*memory) %d\n", zaehler_sleeps, sizeof(*memory));
+        printf("Loop Number %d sizeof(*memory) Zero\n", zaehler_sleeps);
     }
     
-    free(memory);
+    //free(memory);
     //*memory = NULL;
 
 	return 0;
