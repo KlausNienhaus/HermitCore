@@ -33,7 +33,7 @@
 
 
 #define maxtry 50
-#define retytime 300
+#define retytime 50
 //static uint8_t *guest_mem = NULL;
 //size_t* pgt;
 
@@ -361,7 +361,7 @@ int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *
         printf("Invalid address/ Address not supported \n");
         exit(EXIT_FAILURE);
     }
-    usleep(10);
+    //usleep(1);
     int try=0;
     retry1:
     // Connect to Server with assambeled information in struct serv_addr
@@ -509,7 +509,7 @@ int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32
         exit(EXIT_FAILURE);
     }
 
-    usleep(10);
+    usleep(5);
     int try=0;
     retry2:
     // Connect to Server with assambeled information in struct serv_addr
@@ -659,7 +659,7 @@ int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_
     }
 
     //needed to be add as otherwise server hasn't socket open in time
-    usleep(20);
+    usleep(40);
     int try=0;
     retry3:
     // Connect to Server with assambeled information in struct serv_addr
