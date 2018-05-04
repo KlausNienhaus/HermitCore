@@ -4,7 +4,7 @@ if [ "$#" -ne 3 ]; then
     else
         echo "Illegal number of parameters"
         echo "    usage:"
-        echo "    migration <client-ip> <server-ip> <iterations>"
+        echo "    ./migration.sh <client-ip> <server-ip> <iterations>"
         exit 1;
     fi
 else
@@ -13,25 +13,26 @@ fi
 
 file_empty="coldmig_uhyve_empty.log"
 
+#echo "cold migration" >> $file_empty
 counter=0;
 until [ $counter -eq $iterations ]; do
-     export HERMIT_ISLE=uhyve HERMIT_CHECKPOINT=1 PROXY_COMM=client
-     start_time=$SECONDS
-     /usr/bin/time -f %e -o $file_empty -a bin/proxy x86_64-hermit/extra/tests/migration_test
-     if [ $? -ne 0 ]; then
-        echo "migration proccess encountered an error";
-        exit 1;
-     fi  
-     sleep 0.5;
-     export HERMIT_ISLE=uhyve HERMIT_CHECKPOINT=1 PROXY_COMM=server
-     /usr/bin/time -f %e -o $file_empty -a bin/proxy x86_64-hermit/extra/tests/migration_test
-     if [ $? -ne 0 ]; then
-        echo "migration proccess encountered an error";
-        exit 1;
-     fi 
-     sleep 0.5;
-     let counter+=1
-done
-
-elapsed_time=$(($SECONDS-$start_time))
-echo "Time since start $elapsed_time"
+    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1
+	
+     
+    bin/proxy x86_64-hermit/extra/tests/migration_test & sleep 1 
+    kill -10 $! & start="$(date +%s.%N)"
+    start2="$(date +%s.%N)"	
+    if [ $? -ne 0 ]; then
+       echo "migration proccess encountered an error";
+       exit 1;	
+    fi 
+    wait
+    stop="$(date +%s.%N)"
+    migtime=$(bc <<< "$stop - $start")
+    echo -n "$migtime"  >> $file_empty
+    migtime2=$(bc <<< "$stop - $start2")
+    echo "      $migtime2"  >> $file_empty
+    echo "migration time $migtime"
+    let counter+=1
+    sleep 5
+    done

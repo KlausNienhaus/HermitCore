@@ -196,7 +196,6 @@ static char *comm_old_host = "xxx.xxx.xxx.xxx";
 static bool checkpoint_recieved = false;
 comm_register_t *comm_vcpu_register = NULL;
 
-static uint8_t* dummy = NULL;
 
 static uint64_t memparse(const char *ptr)
 {
@@ -1666,12 +1665,11 @@ nextslot:
 	if 	(strncmp(comm_mode, "client", 6)==0)
 	{
 		
-		//uint8_t dummy = NULL;
-		comm_chunk_server(dummy);
+		comm_chunk_server(NULL);
 		//commclient("checkpoint/chk_config.txt","checkpoint",comm_new_host);
 		//commclient("checkpoint/chk0_core0.dat","checkpoint",comm_new_host);
 		//commclient("checkpoint/chk0_mem.dat","checkpoint",comm_new_host);
-		printf("Client transfered checkpoint and stops execution now\n");
+		//printf("Client transfered checkpoint and stops execution now\n");
 		sigterm_handler(SIGTERM);
 	}
 	
@@ -1702,8 +1700,8 @@ int uhyve_loop(void)
 		hermit_check = getenv("HERMIT_CHECKPOINT");
 		checkpoint_recieved=false;
 	}
-	printf("comm_mode %s\n", comm_mode);
-	printf("hermit_check %s\n", hermit_check);
+	//printf("comm_mode %s\n", comm_mode);
+	//printf("hermit_check %s\n", hermit_check);
 
 	if (hermit_check)
 		ts = atoi(hermit_check);

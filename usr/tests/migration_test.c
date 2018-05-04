@@ -57,7 +57,7 @@ int main(int argc, char** argv)
 
 /*   @brief Run Infintie Loop to test Checkpointing by looking at:
  *  local time differences, process time difference and loop iteration count */
-    while (zaehler_sleeps<100)
+    while (zaehler_sleeps<3)
     {
         
         sys_msleep(1000);

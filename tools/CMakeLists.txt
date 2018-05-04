@@ -15,6 +15,12 @@ install(TARGETS proxy
 install(FILES init.sh
 	DESTINATION tools)
 
+install(FILES migration.sh
+	DESTINATION .)
+
+install(FILES migration_server.sh
+	DESTINATION .)	
+
 # Show include files in IDE
 file(GLOB_RECURSE TOOLS_INCLUDES "*.h")
 add_custom_target(tools_includes_ide SOURCES ${TOOLS_INCLUDES})

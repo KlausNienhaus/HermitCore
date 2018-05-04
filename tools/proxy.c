@@ -1020,7 +1020,7 @@ int socket_loop(int argc, char **argv)
 		close(s);
 		return 1;
 }
-
+/*
 int monitor_main(int argc, char **argv)
 {
 	int ret;
@@ -1042,53 +1042,14 @@ int monitor_main(int argc, char **argv)
 	}
 
 	return 1;
-}
+}*/
 
 int main(int argc, char **argv)
 {
 	int ret;
-	int comm_server_ret;
-	int comm_client_ret;
-
-	hermit_check = getenv("HERMIT_CHECKPOINT");
-	comm_mode = getenv("PROXY_COMM");
 
 
-	printf("PROXY_COMM is set to: %s\n",comm_mode);
-	if (comm_mode)
-	{
-		//sleep(15);
-		//printf("\nStarting in Server Mode \n");
-		//comm_server_ret = commserver();
-		if (strncmp(comm_mode, "server", 6) == 0) {
-			printf("\nStarting in Server Mode \n");
-			//comm_server_ret = commserver();
-			//if (comm_server_ret<0) 
-			//	perror("commclient call failed");
-		} else if (strncmp(comm_mode, "client", 6) == 0) {
-			printf("\nStarting in Client Mode \n");
-			//comm_client_ret = commclient("checkpoint/chk_config.txt");
-			//if (comm_client_ret<0) 
-			//	perror("commclient call failed");
-			//comm_client_ret = commclient("checkpoint/chk0_core0.dat");
-			//if (comm_client_ret<0) perror("commclient call failed");
-			//comm_client_ret = commclient("checkpoint/chk0_mem.dat");
-			//if (comm_client_ret<0) perror("commclient call failed");
-			
-		} else {
-			printf("\n Wrong Environmental Variable PROXY_COMM set\n it supports client and server atm\n", comm_mode);
-		}
-	}
-	else
-	{
-		printf("\nStarting without Client or Server, %s \n", comm_mode);
-		//printf("\nStarting in Client Mode \n");
-		//comm_client_ret = commclient();
-	}
-
-	return monitor_main(argc, argv);
-
-	/*
+	
 	ret = env_init(argv[1]);
 	if (ret)
 		return ret;
@@ -1105,6 +1066,6 @@ int main(int argc, char **argv)
 	default:
 		perror("Unknown monitor");
 	}
-	*/
+	
 	return 1;
 }
