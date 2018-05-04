@@ -32,8 +32,8 @@
 #include "comm.h"
 
 
-#define maxtry 20
-#define retytime 100
+#define maxtry 50
+#define retytime 300
 //static uint8_t *guest_mem = NULL;
 //size_t* pgt;
 
@@ -298,40 +298,37 @@ int comm_config_server(comm_config_t *checkpoint_config)
     //printf("waiting on connection by listen \n");
 
 
-    while(1)
-    {
-        if ((new_conn_fd = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0){
-            perror("accept failed\n");
-            exit(EXIT_FAILURE);
-        }
-        
-        //recieving metadata for data type and control information
-        int nrecv = 0;
-        while (nrecv<sizeof(meta_data))
-            nrecv += recv(new_conn_fd, (void*)((char*)&meta_data)+nrecv, sizeof(meta_data)-nrecv, 0);            
-        if (nrecv < (sizeof(meta_data))){
-            perror("Meta_data not correct received in register_server \n");
-            exit(EXIT_FAILURE);
-        }
-        //printf("In comm_config_server recieved sizeof(checkpoint_config) %d, checkpoint_config.elf_entry %d, checkpoint_config.guest_size %d",sizeof(checkpoint_config), checkpoint_config.elf_entry , checkpoint_config.guest_size);
 
-        if (strcmp(meta_data.data_name,"config")==0){
-            int nrecv = 0;
-            while (nrecv<sizeof(comm_config_t))
-                nrecv += recv(new_conn_fd, ((char*)checkpoint_config)+nrecv, sizeof(comm_config_t)-nrecv, 0);
-            //printf("config nrecv %d sizeof(comm_config_t) %d meta_size %d \n", nrecv ,sizeof(comm_config_t),meta_data.data_size);
-            if (nrecv<sizeof(comm_config_t))
-                perror("Register recieved incomplete\n");
-            else if (nrecv=sizeof(comm_config_t)){
-                close(new_conn_fd); 
-                break;
-            }
-        }else{
-            printf("config_server wrong meta_data: Name %s, Position: %s in config recieved\n", meta_data.data_name, meta_data);
-            exit(EXIT_FAILURE);
-        }
-       
+    if ((new_conn_fd = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0){
+        perror("accept failed\n");
+        exit(EXIT_FAILURE);
     }
+    
+    //recieving metadata for data type and control information
+    int nrecv = 0;
+    while (nrecv<sizeof(meta_data))
+        nrecv += recv(new_conn_fd, (void*)((char*)&meta_data)+nrecv, sizeof(meta_data)-nrecv, 0);            
+    if (nrecv < (sizeof(meta_data))){
+        perror("Meta_data not correct received in register_server \n");
+        exit(EXIT_FAILURE);
+    }
+    //printf("In comm_config_server recieved sizeof(checkpoint_config) %d, checkpoint_config.elf_entry %d, checkpoint_config.guest_size %d",sizeof(checkpoint_config), checkpoint_config.elf_entry , checkpoint_config.guest_size);
+
+    if (strcmp(meta_data.data_name,"config")==0){
+        int nrecv = 0;
+        while (nrecv<sizeof(comm_config_t))
+            nrecv += recv(new_conn_fd, ((char*)checkpoint_config)+nrecv, sizeof(comm_config_t)-nrecv, 0);
+        //printf("config nrecv %d sizeof(comm_config_t) %d meta_size %d \n", nrecv ,sizeof(comm_config_t),meta_data.data_size);
+        if (nrecv<sizeof(comm_config_t))
+            perror("Register recieved incomplete\n");
+    }else{
+        printf("config_server wrong meta_data: Name %s, Position: %s in config recieved\n", meta_data.data_name, meta_data);
+        close(new_conn_fd);
+        close(server_fd);
+        exit(EXIT_FAILURE);
+    }
+    close(new_conn_fd);   
+
     //printf("Config for migration recieved\n");
     close(server_fd);
     return 0;
@@ -444,42 +441,39 @@ int comm_register_server(comm_register_t *vcpu_register, uint32_t *cpuid, uint32
     //printf("waiting on connection by listen \n");
 
 
-    while(1)
-    {
-        if ((new_conn_fd = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0){
-            perror("accept failed\n");
-            exit(EXIT_FAILURE);
-        }
-        
-        //recieving metadata for data type and control information
-        int nrecv = 0;
-        while (nrecv < sizeof(meta_data))
-            nrecv += recv(new_conn_fd, (void*)((char*)&meta_data)+nrecv, sizeof(meta_data)-nrecv, 0);            
-        if (nrecv < sizeof(meta_data)){
-            perror("Meta_data not correct received in register_server \n");
-            exit(EXIT_FAILURE);
-        }
 
-        //printf("In register_server metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
-        //printf("In register_server size of ncores register: %d", *ncores*sizeof(comm_register_t));
-        
-        if(strcmp(meta_data.data_name,"register")==0){
-            int nrecv = 0;
-            while (nrecv < (*ncores*sizeof(comm_register_t)))
-                nrecv += recv(new_conn_fd, (void*)((size_t)vcpu_register+nrecv), (*ncores*sizeof(comm_register_t))-nrecv, 0);
-            if (nrecv < (*ncores*sizeof(comm_register_t)))
-                perror("Register recieved incomplete\n");
-            else if (nrecv=(*ncores*sizeof(comm_register_t))){
-                close(new_conn_fd); 
-                break;
-            }
-        } else {
-        printf("wrong meta_data %s in register recieved", meta_data.data_name);
+    if ((new_conn_fd = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0){
+        perror("accept failed\n");
         exit(EXIT_FAILURE);
-        }
-        
-        
     }
+    
+    //recieving metadata for data type and control information
+    int nrecv = 0;
+    while (nrecv < sizeof(meta_data))
+        nrecv += recv(new_conn_fd, (void*)((char*)&meta_data)+nrecv, sizeof(meta_data)-nrecv, 0);            
+    if (nrecv < sizeof(meta_data)){
+        perror("Meta_data not correct received in register_server \n");
+        exit(EXIT_FAILURE);
+    }
+
+    //printf("In register_server metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
+    //printf("In register_server size of ncores register: %d", *ncores*sizeof(comm_register_t));
+    
+    if(strcmp(meta_data.data_name,"register")==0){
+        int nrecv = 0;
+        while (nrecv < (*ncores*sizeof(comm_register_t)))
+            nrecv += recv(new_conn_fd, (void*)((size_t)vcpu_register+nrecv), (*ncores*sizeof(comm_register_t))-nrecv, 0);
+        if (nrecv < (*ncores*sizeof(comm_register_t)))
+            perror("Register recieved incomplete\n");
+    } else {
+        printf("wrong meta_data %s in register recieved", meta_data.data_name);
+        close(new_conn_fd);
+        close(server_fd); 
+        exit(EXIT_FAILURE);
+    }
+    close(new_conn_fd);     
+        
+    
     //printf("Register for migration recieved\n");
     close(server_fd);
     return 0;
@@ -548,6 +542,7 @@ int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32
         nsent += send(client_fd, (void*)((size_t)vcpu_register+nsent), (*ncores*sizeof(comm_register_t))-nsent, 0);
     if (nsent < (*ncores*sizeof(comm_register_t))){
             perror("Register not correct send \n");
+            close(client_fd);
             exit(EXIT_FAILURE);
         } 
     
@@ -598,39 +593,36 @@ int comm_clock_server(struct kvm_clock_data *clock)
     }
     //printf("clock_server waiting on connection by listen \n");
 
-    while(1)
-    {
-        if ((new_conn_fd = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0){
-            perror("accept failed\n");
-            exit(EXIT_FAILURE);
-        }
-        
-        //recieving metadata for data type and control information
-        int nrecv = 0;
-        while (nrecv < sizeof(meta_data))
-            nrecv += recv(new_conn_fd, (void*)((char*)&meta_data)+nrecv, sizeof(meta_data)-nrecv, 0);            
-        if (nrecv < (sizeof(meta_data))){
-            perror("Meta_data not correct received in clock_server \n");
-            exit(EXIT_FAILURE);
-        }
-        //printf("In clock_server metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
 
-        if (strcmp(meta_data.data_name,"clock")==0){
-            int nrecv = 0;
-            while (nrecv<sizeof(*clock))
-                nrecv += recv(new_conn_fd,(void*)((char*)clock)+nrecv, sizeof(*clock)-nrecv, 0);
-            if (nrecv<(sizeof(*clock)))
-                perror("Clock recieved incomplete\n");
-            else if (nrecv=sizeof(*clock)){
-                close(new_conn_fd); 
-                break;
-            }
-        } else {
-            printf("Wrong meta_data %s in clock recieved", meta_data.data_name);
-            exit(EXIT_FAILURE);
-        }
-        close(new_conn_fd);
+    if ((new_conn_fd = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0){
+        perror("accept failed\n");
+        exit(EXIT_FAILURE);
     }
+    
+    //recieving metadata for data type and control information
+    int nrecv = 0;
+    while (nrecv < sizeof(meta_data))
+        nrecv += recv(new_conn_fd, (void*)((char*)&meta_data)+nrecv, sizeof(meta_data)-nrecv, 0);            
+    if (nrecv < (sizeof(meta_data))){
+        perror("Meta_data not correct received in clock_server \n");
+        exit(EXIT_FAILURE);
+    }
+    //printf("In clock_server metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
+
+    if (strcmp(meta_data.data_name,"clock")==0){
+        int nrecv = 0;
+        while (nrecv<sizeof(*clock))
+            nrecv += recv(new_conn_fd,(void*)((char*)clock)+nrecv, sizeof(*clock)-nrecv, 0);
+        if (nrecv<(sizeof(*clock)))
+            perror("Clock recieved incomplete\n");
+    } else {
+        printf("Wrong meta_data %s in clock recieved", meta_data.data_name);
+        close(new_conn_fd);
+        close(server_fd);
+        exit(EXIT_FAILURE);
+    }
+    close(new_conn_fd);
+
 
     //printf("Clock for migration recieved\n");
     close(server_fd);
@@ -817,6 +809,8 @@ int comm_chunk_server(uint8_t* mem)
             break;
         } else {
             perror("data_name in chunk_server wrong %s\n");
+            close(new_conn_fd);
+            close(server_fd);
             exit(EXIT_FAILURE);
         }
         //memorypart++;
@@ -918,6 +912,7 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char 
                 chunk_size=PAGE_SIZE;
             } else {
                 printf("ChunkSize in meta_data wrong in comm_chunk_client \n");
+                close(client_fd);
                 exit(EXIT_FAILURE);
             }
             if (total < (sizeof(size_t)+chunk_size)){
@@ -929,6 +924,7 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char 
         return 0;
     } else {
         perror("transfer type in Data_Name wrong in comm_chunk_client\n");
+        close(client_fd);
         exit(EXIT_FAILURE);
     }
     
