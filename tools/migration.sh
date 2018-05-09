@@ -23,19 +23,25 @@ until [ $counter -eq $iterations ]; do
 	
      
     bin/proxy x86_64-hermit/extra/tests/migration_test0 & sleep 2 
-    kill -10 $! & start="$(date +%s.%N)"
+    kill -10 $! & start="$(date -u +%s.%N)"
     start2="$(date +%s.%N)"	
     if [ $? -ne 0 ]; then
        echo "migration proccess encountered an error";
        exit 1;	
     fi 
     wait
-    stop="$(date +%s.%N)"
+    stop="$(date -u +%s.%N)"
+    start3="$(date +%s.%N)"
+    END=$(echo "$(date -u +%s.%N) - $start" | bc)
     migtime=$(bc <<< "$stop - $start")
     echo -n "$migtime"  >> $file_empty
     migtime2=$(bc <<< "$stop - $start2")
     echo "      $migtime2"  >> $file_empty
     echo "migration time $migtime"
+    echo "migration end $END"
+    END2=$(echo "$(date -u +%s.%N) - $start3" | bc) 
+    echo "migration end $END2"
+
     let counter+=1
     sleep 15
     done

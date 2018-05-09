@@ -34,6 +34,7 @@
 
 #define maxtry 50
 #define retytime 10
+size_t memory_chunk=0;
 //static uint8_t *guest_mem = NULL;
 //size_t* pgt;
 
@@ -344,6 +345,10 @@ int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *
     char buffer[1024] = {0};
     comm_socket_header_t meta_data;
     //comm_type = "config";
+    struct timeval begin, end; // config_begin, config_end;
+
+    gettimeofday(&begin, NULL);
+
      
     
     // starting socket in IPv4 mode as AF_INET indicates
@@ -397,8 +402,13 @@ int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *
         exit(EXIT_FAILURE);
     }
   
-    printf("Config for migration send \n");
+    //printf("Config for migration send \n");
     close(client_fd);
+    gettimeofday(&end, NULL);
+	size_t usec = (end.tv_sec - begin.tv_sec) * 1000000;
+	usec += (end.tv_usec - begin.tv_usec);
+    printf("Send Config in %zd us\n", usec);
+
     return 0;
 }
 
@@ -473,7 +483,8 @@ int comm_register_server(comm_register_t *vcpu_register, uint32_t *cpuid, uint32
         exit(EXIT_FAILURE);
     }
     close(new_conn_fd);     
-        
+
+
     
     printf("Register for migration recieved\n");
     close(server_fd);
@@ -491,7 +502,9 @@ int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32
     char buffer[1024] = {0};
     comm_socket_header_t meta_data;
     //char *comm_type = "register";
+    struct timeval begin, end; // config_begin, config_end;
 
+    gettimeofday(&begin, NULL);
     
     // starting socket in IPv4 mode as AF_INET indicates
     if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
@@ -550,8 +563,12 @@ int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32
     //printf("In comm_register_client send size %d vcpu_register->regs %d vcpu_register->lapic %d\n",sizeof(*vcpu_register),vcpu_register->regs, vcpu_register->lapic);
     //printf("In comm_register_client send size %d vcpu_register[*cpuid].regs %d vcpu_register[*cpuid].lapic %d\n",vcpu_register[*cpuid].regs, vcpu_register[*cpuid].lapic);
 
-    printf("Register for migration send\n");
+    //printf("Register for migration send\n");
     close(client_fd);
+    gettimeofday(&end, NULL);
+		size_t usec = (end.tv_sec - begin.tv_sec) * 1000000;
+		usec += (end.tv_usec - begin.tv_usec);
+    printf("Send register in %zd us\n", usec);
     return 0;
 }
 
@@ -639,6 +656,8 @@ int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_
     int client_fd = 0; //data_size;
     char buffer[1024] = {0};
     comm_socket_header_t meta_data;
+    struct timeval begin, end; // config_begin, config_end;
+    gettimeofday(&begin, NULL);
     
     //printf("start comm client \n"); 
     
@@ -700,8 +719,12 @@ int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_
             exit(EXIT_FAILURE);
         } 
     
-    printf("Clock for migration send\n");
+    //printf("Clock for migration send\n");
     close(client_fd);
+    gettimeofday(&end, NULL);
+	size_t usec = (end.tv_sec - begin.tv_sec) * 1000000;
+	usec += (end.tv_usec - begin.tv_usec);
+    printf("Send clock in %zd us\n", usec);
     return 0;
 }
 
@@ -714,9 +737,11 @@ int comm_chunk_server(uint8_t* mem)
     int opt = 1, filesrecv = 0, addrlen = sizeof(address);
     char buffer[1024]= {0};
     size_t location;
-    //size_t memorypart=0;
+    size_t memorypart=0;
     //unsigned long masksize;
     comm_socket_header_t meta_data = {0};
+    struct timeval begin, end, chunk_begin, chunk_end, wait_start; // wait_end;
+    gettimeofday(&begin, NULL);
 
 
     // creating socket file descriptor
@@ -749,11 +774,12 @@ int comm_chunk_server(uint8_t* mem)
     //printf("waiting on connection by listen in mem chunk server \n");
 
     while(1){
+        gettimeofday(&wait_start, NULL);
         if ((new_conn_fd = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0){
             perror("accept failed\n");
             exit(EXIT_FAILURE);
         }
-        
+        gettimeofday(&chunk_begin, NULL);
         //recieving metadata for data type and control information
         int nrecv = 0;
         while (nrecv < sizeof(meta_data))
@@ -792,6 +818,7 @@ int comm_chunk_server(uint8_t* mem)
                 //printf("nrecv %d Page_Size %d\n", nrecv, (PAGE_SIZE));
                 chunk_size=PAGE_SIZE;
             }
+
             /*
             if (nrecv==PAGE_SIZE)
                 printf("Page_Size recv\n");
@@ -814,11 +841,22 @@ int comm_chunk_server(uint8_t* mem)
             close(server_fd);
             exit(EXIT_FAILURE);
         }
-        //memorypart++;
+
+        gettimeofday(&chunk_end, NULL);
+        size_t usec = (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
+	    usec += (chunk_end.tv_usec - chunk_begin.tv_usec);
+        size_t wait_usec = (chunk_begin.tv_sec - wait_start.tv_sec) * 1000000;
+	    wait_usec += (chunk_begin.tv_usec - wait_start.tv_usec);
+        memorypart++;
+        printf("Received memory chunk %d in %zd us and waited for %zd us\n", memorypart, usec, wait_usec);
         //printf("memorypart %d recieved. \n ", memorypart);
         close(new_conn_fd);
     }
           
+    gettimeofday(&end, NULL);
+	size_t usec = (end.tv_sec - begin.tv_sec) * 1000000;
+	usec += (end.tv_usec - begin.tv_usec);
+    printf("Received memory in %zd us\n", usec);
 
     printf("Memory for migration recieved returning to loading process\n");
     close(server_fd);
@@ -834,7 +872,10 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char 
     int client_fd = 0; //data_size;
     char buffer[1024] = {0};
 
-    comm_socket_header_t meta_data;
+    //unsigned long masksize;
+    comm_socket_header_t meta_data = {0};
+    struct timeval begin, end, chunk_begin, chunk_end, connect_start; // wait_end;
+    gettimeofday(&begin, NULL);
 
       
     // starting socket in IPv4 mode as AF_INET indicates
@@ -854,6 +895,7 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char 
         exit(EXIT_FAILURE);
     }
 
+    gettimeofday(&connect_start, NULL);
     //needed to be add as otherwise server hasn't socket open in time
     usleep(1);
     int try=0;
@@ -861,7 +903,7 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char 
     // Connect to Server with assambeled information in struct serv_addr
     if (connect(client_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0){
         if (try<maxtry){
-                usleep(retytime);
+                usleep(3);
                 try++;
                 goto retry4;
             }   
@@ -869,6 +911,7 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char 
         exit(EXIT_FAILURE);
     }
     
+    gettimeofday(&chunk_begin, NULL);
     //data_name and data_position in this case codes the type of transfer comming for comm_server
     strcpy(meta_data.data_name, comm_type);
     strcpy(meta_data.data_position, comm_subtype);
@@ -888,6 +931,7 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char 
         exit(EXIT_FAILURE);
     }
 
+
     if((strcmp(meta_data.data_name,"mem")==0) && (strcmp(meta_data.data_position,"finished")!=0)){
         unsigned long chunk_size=0;  
         int nsent=0;
@@ -899,18 +943,21 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char 
         if (strcmp(meta_data.data_position,"PAGE_BITS")==0){
             while(nsent<(1UL << PAGE_BITS))
                 total += nsent += send(client_fd, (void*)((size_t)mem_chunck)+nsent, (1UL << PAGE_BITS)-nsent, 0);
-            //printf("nsent %d Page_Bits %d\n", nsent, (1UL << PAGE_BITS));
-            chunk_size=(1UL << PAGE_BITS);
+                //printf("nsent %d Page_Bits %d\n", nsent, (1UL << PAGE_BITS));
+                chunk_size=(1UL << PAGE_BITS);
+                gettimeofday(&chunk_end, NULL);
             } else if (strcmp(meta_data.data_position,"PAGE_2M_BITS")==0){
                 while(nsent<(1UL << PAGE_2M_BITS))
                     total += nsent += send(client_fd, (void*)((size_t)mem_chunck)+nsent, (1UL << PAGE_2M_BITS)-nsent, 0);
                 //printf("nsent %d Page_2M %d\n", nsent, (1UL << PAGE_2M_BITS));
                 chunk_size=(1UL << PAGE_2M_BITS);
+                gettimeofday(&chunk_end, NULL);
             } else if (strcmp(meta_data.data_position,"PAGE_SIZE")==0) {
                 while(nsent<PAGE_SIZE)
                     total += nsent += send(client_fd, (void*)((size_t)mem_chunck)+nsent, PAGE_SIZE-nsent, 0);
                 //printf("nsent %d Page_Size %d\n", nsent, PAGE_SIZE);
                 chunk_size=PAGE_SIZE;
+                gettimeofday(&chunk_end, NULL);
             } else {
                 printf("ChunkSize in meta_data wrong in comm_chunk_client \n");
                 close(client_fd);
@@ -922,6 +969,7 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char 
             }
     } else if ((strcmp(meta_data.data_name,"mem")==0) && (strcmp(meta_data.data_position,"finished")==0)) {
         printf("All Memory chunks sent \n");
+        memory_chunk=0;
         close(client_fd);
         return 0;
     } else {
@@ -929,7 +977,19 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char 
         close(client_fd);
         exit(EXIT_FAILURE);
     }
-    
+
+    gettimeofday(&end, NULL);
+    size_t usec = (end.tv_sec - begin.tv_sec) * 1000000;
+	usec += (end.tv_usec - begin.tv_usec);
+    size_t start_usec = (connect_start.tv_sec - begin.tv_sec) * 1000000;
+	start_usec += (connect_start.tv_usec - begin.tv_usec);
+    size_t connect_usec = (chunk_begin.tv_sec - connect_start.tv_sec) * 1000000;
+	connect_usec += (chunk_begin.tv_usec - connect_start.tv_usec);
+    size_t chunk_usec = (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
+	chunk_usec += (chunk_end.tv_usec - chunk_begin.tv_usec);
+    memory_chunk++;
+    printf("Transferred memory chunk %d in %zd us, start to connect %zd us, connect time %zd us and chunk_transfer time %zd us \n", memory_chunk, usec, start_usec, connect_usec, chunk_usec);
+
     close(client_fd);
     return 0;
 }

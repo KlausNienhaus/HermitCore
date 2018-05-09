@@ -197,6 +197,8 @@ static bool checkpoint_recieved = false;
 comm_register_t *comm_vcpu_register = NULL;
 
 
+
+
 static uint64_t memparse(const char *ptr)
 {
 	// local pointer to end of parsed string
@@ -433,6 +435,7 @@ static int load_checkpoint(uint8_t* mem, char* path)
 	int ret;
 	struct timeval begin, end;
 	uint32_t i;
+	
 
 	//printf("In load_checkpoint gettimeofday next\n");
 	if (verbose)
@@ -1435,20 +1438,30 @@ static void timer_handler(int signum)
 	struct stat st = {0};
 	const size_t flag = (!full_checkpoint && (no_checkpoint > 0)) ? PG_DIRTY : PG_ACCESSED;
 	char fname[MAX_FNAME];
-	struct timeval begin, end;
+	struct timeval begin, end, config_begin, config_end, vcpu_begin, vcpu_end, clock_begin, clock_end, memory_begin, memory_end, chunk_begin, chunk_end;
 	FILE* f = NULL;
+	//size_t start_config, config_time_spent; // memorypart=0;
 
 	//printf("signum: %d\n", signum);
 
 	if (verbose)
 		gettimeofday(&begin, NULL);
 
+	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
+	gettimeofday(&begin, NULL);
+
 	if (stat("checkpoint", &st) == -1)
 		mkdir("checkpoint", 0700);
 
 
+	
+	
+	
+
 	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
 	{
+		
+	
 		comm_config_t checkpoint_config;
 		checkpoint_config.ncores=ncores;
 		checkpoint_config.guest_size=guest_size;
@@ -1456,8 +1469,11 @@ static void timer_handler(int signum)
 		checkpoint_config.elf_entry=elf_entry;
 		checkpoint_config.full_checkpoint=full_checkpoint;
 
-		
+		gettimeofday(&config_begin, NULL);
 		comm_config_client(&checkpoint_config, comm_new_host, "config", "NULL");
+		gettimeofday(&config_end, NULL);
+		
+	
 		if (comm_vcpu_register==NULL)
 			//comm_vcpu_register = vcpu_register;
 			comm_vcpu_register = (comm_register_t*) calloc(ncores,sizeof(comm_register_t));
@@ -1468,6 +1484,9 @@ static void timer_handler(int signum)
 			comm_vcpu_register = (comm_register_t*) calloc(ncores,sizeof(comm_register_t));
 		}
 	}
+	
+
+
 	if (hermit_check>0){
 	// update configuration file
 	f = fopen("checkpoint/chk_config.txt", "w");
@@ -1486,8 +1505,11 @@ static void timer_handler(int signum)
 
 	fclose(f);
 	}
+	
+	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
+		gettimeofday(&vcpu_begin, NULL);
 
-
+	
 	for (size_t i = 0; i < ncores; i++)
 		if (vcpu_threads[i] != pthread_self())
 			pthread_kill(vcpu_threads[i], SIGRTMIN);
@@ -1495,6 +1517,8 @@ static void timer_handler(int signum)
 	pthread_barrier_wait(&barrier);
 
 	save_cpu_state();
+
+
 
 	if (strncmp(comm_mode, "client", 6)==0 && signum==10)
 	{
@@ -1504,6 +1528,11 @@ static void timer_handler(int signum)
 
 		
 	}
+
+	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
+		gettimeofday(&vcpu_end, NULL);
+
+
 	if (hermit_check>0){	//((hermit_check>0)&&!(strncmp(comm_mode, "client", 6)==0))
 		snprintf(fname, MAX_FNAME, "checkpoint/chk%u_mem.dat", no_checkpoint);
 		f = fopen(fname, "w");
@@ -1519,16 +1548,23 @@ static void timer_handler(int signum)
 	if (fwrite(&irqchip, sizeof(irqchip), 1, f) != 1)
 		err(1, "fwrite failed");*/
 
-	struct kvm_clock_data clock = {};
-	kvm_ioctl(vmfd, KVM_GET_CLOCK, &clock);
+	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
+		gettimeofday(&clock_begin, NULL);
+
+	struct kvm_clock_data kvm_clock = {};
+	kvm_ioctl(vmfd, KVM_GET_CLOCK, &kvm_clock);
 	//printf("timer_hander sending clock over clock_client next\n");
 	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
-		comm_clock_client(&clock, comm_new_host, "clock", "NULL");
+		comm_clock_client(&kvm_clock, comm_new_host, "clock", "NULL");
 	if (hermit_check>0){
-		if (fwrite(&clock, sizeof(clock), 1, f) != 1)
+		if (fwrite(&kvm_clock, sizeof(kvm_clock), 1, f) != 1)
 			err(1, "fwrite failed");
 	}
+	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
+		gettimeofday(&clock_end, NULL);
 
+	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
+		gettimeofday(&memory_begin, NULL);
 #if 0
 	if (fwrite(guest_mem, guest_size, 1, f) != 1)
 		err(1, "fwrite failed");
@@ -1569,7 +1605,13 @@ nextslot:
 				{
 					size_t addr = (i*sizeof(size_t)*8+j)*PAGE_SIZE;
 					if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
+						//gettimeofday(&chunk_start, NULL);
 						comm_chunk_client(&addr, (size_t*) (guest_mem + addr), comm_new_host, "mem","PAGE_SIZE");
+						/*memorypart++;
+						gettimeofday(&chunk_end, NULL);
+						size_t usec = (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
+						usec += (chunk_end.tv_usec - chunk_begin.tv_usec);
+						printf("Send memory chunk %d in %zd us and waited \n", memorypart, usec);*/
 					if (hermit_check>0){
 						if (fwrite(&addr, sizeof(size_t), 1, f) != 1)
 							err(1, "fwrite failed");
@@ -1617,7 +1659,13 @@ nextslot:
 							size_t pgt_entry = pgt[l] & ~PG_PSE; // because PAT use the same bit as PSE
 								//printf("timer_hander sending mem_chunk page_bits chunk_client next\n");
 							if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
+								//gettimeofday(&chunk_begin, NULL);
 								comm_chunk_client(&pgt_entry, (size_t*)(guest_mem + (pgt[l] & PAGE_MASK)), comm_new_host, "mem","PAGE_BITS");
+								/*memorypart++;
+								gettimeofday(&chunk_end, NULL);
+								size_t usec = (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
+	    						usec += (chunk_end.tv_usec - chunk_begin.tv_usec);
+								printf("Send memory chunk %d in %zd us \n", memorypart, usec);*/
 							if (hermit_check>0){
 								if (fwrite(&pgt_entry, sizeof(size_t), 1, f) != 1)
 									err(1, "fwrite failed");
@@ -1633,7 +1681,13 @@ nextslot:
 						pgd[k] = pgd[k] & ~(PG_DIRTY|PG_ACCESSED);
 						//printf("timer_hander sending mem_chunk page_2M chunk_client next\n");
 					if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
+						//gettimeofday(&chunk_begin, NULL);
 						comm_chunk_client(pgd+k, (size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), comm_new_host, "mem","PAGE_2M_BITS");
+						/*memorypart++;
+						gettimeofday(&chunk_end, NULL);
+						size_t usec = (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
+						usec += (chunk_end.tv_usec - chunk_begin.tv_usec);
+						printf("Send memory chunk %d in %zd us and waited \n", memorypart, usec);*/
 					if (hermit_check>0){
 						if (fwrite(pgd+k, sizeof(size_t), 1, f) != 1)
 							err(1, "fwrite failed");
@@ -1651,6 +1705,10 @@ nextslot:
 	if 	(hermit_check>0)
 		fclose(f);
 
+	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
+	gettimeofday(&memory_end, NULL);
+
+
 	pthread_barrier_wait(&barrier);
 
 	if (verbose) {
@@ -1664,8 +1722,30 @@ nextslot:
 
 	if 	(strncmp(comm_mode, "client", 6)==0)
 	{
-		
+
 		comm_chunk_server(NULL);
+		//mig_end = clock();
+		gettimeofday(&end, NULL);
+		size_t mig_time_spent = (end.tv_sec - begin.tv_sec) * 1000000;
+		mig_time_spent += (end.tv_usec - begin.tv_usec);
+		//fprintf(stderr, "Create checkpoint %u in %zd ms\n", no_checkpoint, msec);
+		
+		size_t start_config = (config_begin.tv_sec - begin.tv_sec) * 1000000;
+		start_config += (config_begin.tv_usec - begin.tv_usec);
+
+		size_t config_time_spent = (config_end.tv_sec - config_begin.tv_sec) * 1000000;
+		config_time_spent += (config_end.tv_usec - config_begin.tv_usec);
+
+		size_t vcpu_time_spent = (vcpu_end.tv_sec - vcpu_begin.tv_sec) * 1000000;
+		vcpu_time_spent += (vcpu_end.tv_usec - vcpu_begin.tv_usec);
+
+		size_t clock_time_spent = (clock_end.tv_sec - clock_begin.tv_sec) * 1000000;
+		clock_time_spent += (clock_end.tv_usec - clock_begin.tv_usec);
+
+		size_t memory_time_spent = (memory_end.tv_sec - memory_begin.tv_sec) * 1000000;
+		memory_time_spent += (memory_end.tv_usec - memory_begin.tv_usec);
+
+		printf("TimeSpent Mig: %zd us, StartConfig: %zd us, Config: %zd us, vcpu: %zd us, clock: %zd us, memory: %zd us\n", mig_time_spent, start_config, config_time_spent, vcpu_time_spent, clock_time_spent, memory_time_spent);
 		//commclient("checkpoint/chk_config.txt","checkpoint",comm_new_host);
 		//commclient("checkpoint/chk0_core0.dat","checkpoint",comm_new_host);
 		//commclient("checkpoint/chk0_mem.dat","checkpoint",comm_new_host);
