@@ -785,11 +785,7 @@ static int vcpu_loop(void)
 	int ret;
 
 	if (restart) {
-<<<<<<< HEAD
 		comm_client_connect(comm_old_host);
-=======
-		comm_client_connect(comm_new_host);
->>>>>>> 65edc6e7b745b0e103a2da682d9c5258e051bd9f
 		comm_chunk_client(NULL, NULL, comm_old_host, "mem","finished");
 		comm_client_disconnect();
 		if (cpuid == 0)
