@@ -785,7 +785,9 @@ static int vcpu_loop(void)
 	int ret;
 
 	if (restart) {
+		comm_client_connect(comm_old_host);
 		comm_chunk_client(NULL, NULL, comm_old_host, "mem","finished");
+		comm_client_disconnect();
 		if (cpuid == 0)
 			no_checkpoint++;
 	}
@@ -1529,6 +1531,10 @@ static void timer_handler(int signum)
 			err(1, "fwrite failed");
 	}
 
+	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
+		comm_client_connect(comm_new_host);
+	
+
 #if 0
 	if (fwrite(guest_mem, guest_size, 1, f) != 1)
 		err(1, "fwrite failed");
@@ -1648,6 +1654,9 @@ nextslot:
 	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
 		comm_chunk_client(NULL, NULL, comm_new_host, "mem","finished");
 #endif
+	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
+		comm_client_disconnect();
+
 	if 	(hermit_check>0)
 		fclose(f);
 

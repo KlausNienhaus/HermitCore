@@ -113,6 +113,11 @@ typedef struct comm_config{
 int commserver(void);
 int commclient(char *path, char *position, char *server_ip);
 
+//int comm_server_accept();
+//int comm_server_disconnect();
+
+int comm_client_connect(char *server_ip);
+int comm_client_disconnect();
 
 int comm_config_server(comm_config_t *checkpoint_config);
 int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *comm_type, char *comm_subtype);

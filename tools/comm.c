@@ -34,8 +34,61 @@
 
 #define maxtry 50
 #define retytime 10
+int client_chunk_fd = 0;
 //static uint8_t *guest_mem = NULL;
 //size_t* pgt;
+
+int comm_client_connect(char *server_ip)
+{
+struct sockaddr_in address;
+struct sockaddr_in serv_addr; //data_size;
+char buffer[1024] = {0};
+
+//unsigned long masksize;
+comm_socket_header_t meta_data = {0};
+
+
+// starting socket in IPv4 mode as AF_INET indicates
+if ((client_chunk_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
+    printf("Socket creation error \n");
+    exit(EXIT_FAILURE);
+}
+
+memset(&serv_addr, '0', sizeof(serv_addr));
+serv_addr.sin_family = AF_INET;
+serv_addr.sin_port = htons(PORT);
+// Convert IPv4 (and IPv6) addresses from text to binary form
+if(inet_pton(AF_INET, server_ip, &serv_addr.sin_addr)<=0) {
+    printf("Invalid address/ Address not supported \n");
+    exit(EXIT_FAILURE);
+}
+
+//needed to be add as otherwise server hasn't socket open in time
+usleep(1);
+int try=0;
+retry:
+// Connect to Server with assambeled information in struct serv_addr
+if (connect(client_chunk_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0){
+    if (try<maxtry){
+        usleep(retytime);
+        try++;
+        goto retry;
+} 
+printf("Connection Failed in memory chunk client\n");
+exit(EXIT_FAILURE);
+}
+
+return 0;
+}
+
+int comm_client_disconnect()
+{
+if(client_chunk_fd)
+    close(client_chunk_fd);
+return 0;
+}
+
+
 
 //@brief:   Server side C function for TCP Socket Connections 
 //          atm recieves data file from client (e.g. checkpoint)
@@ -706,6 +759,7 @@ int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_
 }
 
 
+
 //@brief: recieves memory_chunks until all parts have been recieved and are aligned back together to a bigger memory image
 int comm_chunk_server(uint8_t* mem)
 {
@@ -714,10 +768,9 @@ int comm_chunk_server(uint8_t* mem)
     int opt = 1, filesrecv = 0, addrlen = sizeof(address);
     char buffer[1024]= {0};
     size_t location;
-    //size_t memorypart=0;
+    size_t memorypart=0;
     //unsigned long masksize;
     comm_socket_header_t meta_data = {0};
-
 
     // creating socket file descriptor
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0){
@@ -731,7 +784,6 @@ int comm_chunk_server(uint8_t* mem)
         exit(EXIT_FAILURE);
     }
     
-
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons( PORT );
@@ -748,12 +800,13 @@ int comm_chunk_server(uint8_t* mem)
     }
     //printf("waiting on connection by listen in mem chunk server \n");
 
+    if ((new_conn_fd = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0){
+        perror("accept failed\n");
+        exit(EXIT_FAILURE);
+    }
+  
+
     while(1){
-        if ((new_conn_fd = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0){
-            perror("accept failed\n");
-            exit(EXIT_FAILURE);
-        }
-        
         //recieving metadata for data type and control information
         int nrecv = 0;
         while (nrecv < sizeof(meta_data))
@@ -792,6 +845,7 @@ int comm_chunk_server(uint8_t* mem)
                 //printf("nrecv %d Page_Size %d\n", nrecv, (PAGE_SIZE));
                 chunk_size=PAGE_SIZE;
             }
+
             /*
             if (nrecv==PAGE_SIZE)
                 printf("Page_Size recv\n");
@@ -814,11 +868,15 @@ int comm_chunk_server(uint8_t* mem)
             close(server_fd);
             exit(EXIT_FAILURE);
         }
-        //memorypart++;
+
         //printf("memorypart %d recieved. \n ", memorypart);
-        close(new_conn_fd);
+        //close(new_conn_fd);
     }
           
+    /*gettimeofday(&end, NULL);
+	size_t usec = (end.tv_sec - begin.tv_sec) * 1000000;
+	usec += (end.tv_usec - begin.tv_usec);
+    printf("Received memory in %zd us\n", usec);*/
 
     printf("Memory for migration recieved returning to loading process\n");
     close(server_fd);
@@ -829,46 +887,14 @@ int comm_chunk_server(uint8_t* mem)
 //          atm sends pgd or pgt with corresponding memory to server (e.g. checkpoint)
 int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char *comm_type, char *comm_subtype)
 {
-    struct sockaddr_in address;
-    struct sockaddr_in serv_addr;
-    int client_fd = 0; //data_size;
+    //struct sockaddr_in address;
+    //struct sockaddr_in serv_addr;
+    //int client_chunk_fd = 0; //data_size;
     char buffer[1024] = {0};
 
-    comm_socket_header_t meta_data;
+    //unsigned long masksize;
+    comm_socket_header_t meta_data = {0};
 
-      
-    // starting socket in IPv4 mode as AF_INET indicates
-    if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
-        printf("Socket creation error \n");
-        exit(EXIT_FAILURE);
-    }
-    
-
-    memset(&serv_addr, '0', sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(PORT);
-      
-    // Convert IPv4 (and IPv6) addresses from text to binary form
-    if(inet_pton(AF_INET, server_ip, &serv_addr.sin_addr)<=0) {
-        printf("Invalid address/ Address not supported \n");
-        exit(EXIT_FAILURE);
-    }
-
-    //needed to be add as otherwise server hasn't socket open in time
-    usleep(1);
-    int try=0;
-    retry4:
-    // Connect to Server with assambeled information in struct serv_addr
-    if (connect(client_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0){
-        if (try<maxtry){
-                usleep(retytime);
-                try++;
-                goto retry4;
-            }   
-        printf("Connection Failed in memory chunk client\n");
-        exit(EXIT_FAILURE);
-    }
-    
     //data_name and data_position in this case codes the type of transfer comming for comm_server
     strcpy(meta_data.data_name, comm_type);
     strcpy(meta_data.data_position, comm_subtype);
@@ -882,38 +908,42 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char 
     //sending metadata for data type and control information
     int nsent=0;
     while (nsent < sizeof(meta_data))
-        nsent += send(client_fd, (void*)((char*)&meta_data)+nsent, sizeof(meta_data)-nsent,0);
+        nsent += send(client_chunk_fd, (void*)((char*)&meta_data)+nsent, sizeof(meta_data)-nsent,0);
     if (nsent < (sizeof(meta_data))){
         perror("Meta_data not correct send in chunk_client\n");
         exit(EXIT_FAILURE);
     }
+
 
     if((strcmp(meta_data.data_name,"mem")==0) && (strcmp(meta_data.data_position,"finished")!=0)){
         unsigned long chunk_size=0;  
         int nsent=0;
         int total=0;
         while (nsent < sizeof(size_t))
-            total+= nsent += send(client_fd, (void*)((char*)pgdpgt)+nsent, sizeof(size_t)-nsent, 0);
+            total+= nsent += send(client_chunk_fd, (void*)((char*)pgdpgt)+nsent, sizeof(size_t)-nsent, 0);
         //printf("chunk_client nsent %d sizeof(size_t) %d\n", nsent, sizeof(size_t));
         nsent=0;
         if (strcmp(meta_data.data_position,"PAGE_BITS")==0){
             while(nsent<(1UL << PAGE_BITS))
-                total += nsent += send(client_fd, (void*)((size_t)mem_chunck)+nsent, (1UL << PAGE_BITS)-nsent, 0);
-            //printf("nsent %d Page_Bits %d\n", nsent, (1UL << PAGE_BITS));
-            chunk_size=(1UL << PAGE_BITS);
+                total += nsent += send(client_chunk_fd, (void*)((size_t)mem_chunck)+nsent, (1UL << PAGE_BITS)-nsent, 0);
+                //printf("nsent %d Page_Bits %d\n", nsent, (1UL << PAGE_BITS));
+                chunk_size=(1UL << PAGE_BITS);
+
             } else if (strcmp(meta_data.data_position,"PAGE_2M_BITS")==0){
                 while(nsent<(1UL << PAGE_2M_BITS))
-                    total += nsent += send(client_fd, (void*)((size_t)mem_chunck)+nsent, (1UL << PAGE_2M_BITS)-nsent, 0);
+                    total += nsent += send(client_chunk_fd, (void*)((size_t)mem_chunck)+nsent, (1UL << PAGE_2M_BITS)-nsent, 0);
                 //printf("nsent %d Page_2M %d\n", nsent, (1UL << PAGE_2M_BITS));
                 chunk_size=(1UL << PAGE_2M_BITS);
+
             } else if (strcmp(meta_data.data_position,"PAGE_SIZE")==0) {
                 while(nsent<PAGE_SIZE)
-                    total += nsent += send(client_fd, (void*)((size_t)mem_chunck)+nsent, PAGE_SIZE-nsent, 0);
+                    total += nsent += send(client_chunk_fd, (void*)((size_t)mem_chunck)+nsent, PAGE_SIZE-nsent, 0);
                 //printf("nsent %d Page_Size %d\n", nsent, PAGE_SIZE);
                 chunk_size=PAGE_SIZE;
+  
             } else {
                 printf("ChunkSize in meta_data wrong in comm_chunk_client \n");
-                close(client_fd);
+                close(client_chunk_fd);
                 exit(EXIT_FAILURE);
             }
             if (total < (sizeof(size_t)+chunk_size)){
@@ -922,15 +952,21 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char 
             }
     } else if ((strcmp(meta_data.data_name,"mem")==0) && (strcmp(meta_data.data_position,"finished")==0)) {
         printf("All Memory chunks sent \n");
-        close(client_fd);
+        //memory_chunk=0;
+        //printf("before disconnect in comm_chunk\n");
+        //close(client_chunk_fd);
+        //printf("after disconnect in comm_chunk\n");
         return 0;
     } else {
         perror("transfer type in Data_Name wrong in comm_chunk_client\n");
-        close(client_fd);
+        close(client_chunk_fd);
         exit(EXIT_FAILURE);
     }
-    
-    close(client_fd);
+
+
+    //memory_chunk++;
+    //printf("Transferred memory chunk %d in %zd us and chunk_transfer time %zd us \n", memory_chunk, usec, chunk_usec);
+
+    //close(client_chunk_fd);
     return 0;
 }
-
