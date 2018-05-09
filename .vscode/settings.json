@@ -1,0 +1,29 @@
+{
+    "files.associations": {
+        "socket.h": "c",
+        "signal.h": "c",
+        "const.h": "c",
+        "inet.h": "c",
+        "string.h": "c",
+        "unistd.h": "c",
+        "errno.h": "c",
+        "time.h": "c",
+        "type_traits": "c",
+        "stdio.h": "c",
+        "stdlib.h": "c",
+        "typeinfo": "c",
+        "cstdlib": "c",
+        "initializer_list": "c",
+        "stat.h": "c",
+        "mman.h": "c",
+        "cerrno": "c",
+        "inotify.h": "c",
+        "syscall.h": "c",
+        "malloc.h": "c",
+        "array": "c",
+        "*.inc": "c",
+        "utility": "c",
+        "fstream": "c",
+        "tuple": "c"
+    }
+}

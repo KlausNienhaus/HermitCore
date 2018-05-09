@@ -788,7 +788,9 @@ static int vcpu_loop(void)
 	int ret;
 
 	if (restart) {
+		comm_client_connect(comm_old_host);
 		comm_chunk_client(NULL, NULL, comm_old_host, "mem","finished");
+		comm_client_disconnect();
 		if (cpuid == 0)
 			no_checkpoint++;
 	}
@@ -1565,6 +1567,9 @@ static void timer_handler(int signum)
 
 	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
 		gettimeofday(&memory_begin, NULL);
+
+	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
+		comm_client_connect(comm_new_host);
 #if 0
 	if (fwrite(guest_mem, guest_size, 1, f) != 1)
 		err(1, "fwrite failed");
@@ -1705,8 +1710,10 @@ nextslot:
 	if 	(hermit_check>0)
 		fclose(f);
 
-	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
-	gettimeofday(&memory_end, NULL);
+	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10){
+		gettimeofday(&memory_end, NULL);
+		comm_client_disconnect();
+	}
 
 
 	pthread_barrier_wait(&barrier);
