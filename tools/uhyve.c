@@ -1258,8 +1258,11 @@ int uhyve_init(char *path)
 		}
 	} else {
 		const char* hermit_memory = getenv("HERMIT_MEM");
+		printf("hermit_memory %s\n", hermit_memory);
 		if (hermit_memory)
 			guest_size = memparse(hermit_memory);
+		
+		printf("guest_size %d\n", guest_size);
 
 		const char* hermit_cpus = getenv("HERMIT_CPUS");
 		if (hermit_cpus)

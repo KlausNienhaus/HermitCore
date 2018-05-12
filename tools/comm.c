@@ -33,7 +33,7 @@
 
 
 #define maxtry 50
-#define retytime 10
+#define retrytime 500
 int client_chunk_fd = 0;
 //static uint8_t *guest_mem = NULL;
 //size_t* pgt;
@@ -70,7 +70,7 @@ retry:
 // Connect to Server with assambeled information in struct serv_addr
 if (connect(client_chunk_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0){
     if (try<maxtry){
-        usleep(retytime);
+        usleep(retrytime);
         try++;
         goto retry;
 } 
@@ -382,7 +382,7 @@ int comm_config_server(comm_config_t *checkpoint_config)
     }
     close(new_conn_fd);   
 
-    printf("Config for migration recieved\n");
+    //printf("Config for migration recieved\n");
     close(server_fd);
     return 0;
 }
@@ -414,13 +414,13 @@ int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *
         printf("Invalid address/ Address not supported \n");
         exit(EXIT_FAILURE);
     }
-    //usleep(1);
+    usleep(1);
     int try=0;
     retry1:
     // Connect to Server with assambeled information in struct serv_addr
     if (connect(client_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0){
         if (try<maxtry){
-                usleep(retytime);
+                usleep(retrytime);
                 try++;
                 goto retry1;
             }   
@@ -450,7 +450,7 @@ int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *
         exit(EXIT_FAILURE);
     }
   
-    printf("Config for migration send \n");
+    //printf("Config for migration send \n");
     close(client_fd);
     return 0;
 }
@@ -528,7 +528,7 @@ int comm_register_server(comm_register_t *vcpu_register, uint32_t *cpuid, uint32
     close(new_conn_fd);     
         
     
-    printf("Register for migration recieved\n");
+    //printf("Register for migration recieved\n");
     close(server_fd);
     return 0;
 }
@@ -562,13 +562,13 @@ int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32
         exit(EXIT_FAILURE);
     }
 
-    usleep(5);
+    usleep(20);
     int try=0;
     retry2:
     // Connect to Server with assambeled information in struct serv_addr
     if (connect(client_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0){
         if (try<maxtry){
-                usleep(retytime);
+                usleep(retrytime);
                 try++;
                 goto retry2;
             }   
@@ -603,7 +603,7 @@ int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32
     //printf("In comm_register_client send size %d vcpu_register->regs %d vcpu_register->lapic %d\n",sizeof(*vcpu_register),vcpu_register->regs, vcpu_register->lapic);
     //printf("In comm_register_client send size %d vcpu_register[*cpuid].regs %d vcpu_register[*cpuid].lapic %d\n",vcpu_register[*cpuid].regs, vcpu_register[*cpuid].lapic);
 
-    printf("Register for migration send\n");
+    //printf("Register for migration send\n");
     close(client_fd);
     return 0;
 }
@@ -678,7 +678,7 @@ int comm_clock_server(struct kvm_clock_data *clock)
     close(new_conn_fd);
 
 
-    printf("Clock for migration recieved\n");
+    //printf("Clock for migration recieved\n");
     close(server_fd);
     return 0;
 }
@@ -712,13 +712,13 @@ int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_
     }
 
     //needed to be add as otherwise server hasn't socket open in time
-    usleep(40);
+    usleep(80);
     int try=0;
     retry3:
     // Connect to Server with assambeled information in struct serv_addr
     if (connect(client_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0){
         if (try<maxtry){
-                usleep(retytime);
+                usleep(retrytime);
                 try++;
                 goto retry3;
             }   
@@ -753,11 +753,10 @@ int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_
             exit(EXIT_FAILURE);
         } 
     
-    printf("Clock for migration send\n");
+    //printf("Clock for migration send\n");
     close(client_fd);
     return 0;
 }
-
 
 
 //@brief: recieves memory_chunks until all parts have been recieved and are aligned back together to a bigger memory image
@@ -799,7 +798,6 @@ int comm_chunk_server(uint8_t* mem)
         exit(EXIT_FAILURE);
     }
     //printf("waiting on connection by listen in mem chunk server \n");
-
     if ((new_conn_fd = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0){
         perror("accept failed\n");
         exit(EXIT_FAILURE);
@@ -863,7 +861,7 @@ int comm_chunk_server(uint8_t* mem)
             close(new_conn_fd); 
             break;
         } else {
-            perror("data_name in chunk_server wrong %s\n");
+            printf("data_name in chunk_server wrong %s \n", meta_data.data_name);
             close(new_conn_fd);
             close(server_fd);
             exit(EXIT_FAILURE);
@@ -878,7 +876,7 @@ int comm_chunk_server(uint8_t* mem)
 	usec += (end.tv_usec - begin.tv_usec);
     printf("Received memory in %zd us\n", usec);*/
 
-    printf("Memory for migration recieved returning to loading process\n");
+    //printf("Memory for migration recieved returning to loading process\n");
     close(server_fd);
     return 0;
 }
@@ -951,7 +949,7 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char 
                 exit(EXIT_FAILURE);
             }
     } else if ((strcmp(meta_data.data_name,"mem")==0) && (strcmp(meta_data.data_position,"finished")==0)) {
-        printf("All Memory chunks sent \n");
+        //printf("All Memory chunks sent \n");
         //memory_chunk=0;
         //printf("before disconnect in comm_chunk\n");
         //close(client_chunk_fd);

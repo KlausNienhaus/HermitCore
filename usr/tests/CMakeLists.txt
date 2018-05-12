@@ -14,6 +14,7 @@ add_executable(migration_test1 migration_test1.c)
 add_executable(migration_test2 migration_test2.c)
 add_executable(migration_test4 migration_test4.c)
 add_executable(migration_test8 migration_test8.c)
+add_executable(migration_test16 migration_test16.c)
 add_executable(migration_test250 migration_test250.c)
 add_executable(migration_test500 migration_test500.c)
 
