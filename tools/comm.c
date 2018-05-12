@@ -711,8 +711,8 @@ int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_
         exit(EXIT_FAILURE);
     }
 
-    //needed to be add as otherwise server hasn't socket open in time
-    usleep(80);
+    //needed to be add as otherwise server hasn't socket open in time as memory VM gets initialised in between
+    usleep(200);
     int try=0;
     retry3:
     // Connect to Server with assambeled information in struct serv_addr
