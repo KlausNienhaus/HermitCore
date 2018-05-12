@@ -230,6 +230,7 @@ int commclient(char *path, char *position, char *server_ip)
     }
     
     //needed to be add as otherwise server hasn't socket open in time
+    usleep(50);
     int try=0;
     retry:
     // Connect to Server with assambeled information in struct serv_addr
