@@ -437,7 +437,7 @@ int comm_config_server(comm_config_t *checkpoint_config)
     }
     //close(new_conn_fd);   
 
-    printf("Config for migration recieved\n");
+    //printf("Config for migration recieved\n");
     //close(server_fd);
     return 0;
 }
@@ -592,7 +592,7 @@ int comm_register_server(comm_register_t *vcpu_register, uint32_t *cpuid, uint32
 
 
     
-    printf("Register for migration recieved\n");
+    //printf("Register for migration recieved\n");
     //close(server_fd);
     return 0;
 }
@@ -722,7 +722,7 @@ int comm_clock_server(struct kvm_clock_data *clock)
         exit(EXIT_FAILURE);
     }
 
-    printf("Clock for migration recieved\n");
+    //printf("Clock for migration recieved\n");
     return 0;
 }
 
@@ -907,7 +907,7 @@ int comm_chunk_server(uint8_t* mem)
 	//usec += (end.tv_usec - begin.tv_usec);
     //printf("Received memory in %zd us\n", usec);
 
-    printf("Memory for migration recieved returning to loading process\n");
+    //printf("Memory for migration recieved returning to loading process\n");
     //close(server_chunk_fd);
     return 0;
 }
@@ -985,7 +985,7 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char 
                 exit(EXIT_FAILURE);
             }
     } else if ((strcmp(meta_data.data_name,"mem")==0) && (strcmp(meta_data.data_position,"finished")==0)) {
-        printf("All Memory chunks sent \n");
+        //printf("All Memory chunks sent \n");
         memory_chunk=0;
         //printf("before disconnect in comm_chunk\n");
         //close(client_chunk_fd);
