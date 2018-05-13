@@ -46,8 +46,8 @@
 
 #define PORT 3490
 
-#define maxtry 50
-#define retytime 500
+#define maxtry 10
+#define retytime 1000
 
 //@brief:   Server side C function for TCP Socket Connections 
 //          atm recieves data file from client (e.g. checkpoint)
@@ -110,7 +110,7 @@ int commserver(void)
             perror("Meta_data not correct received in chunk_server \n");
             exit(EXIT_FAILURE);
         }
-        printf("metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
+        //printf("metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
 
         
         if (stat(meta_data.data_position, &st) == -1)
@@ -129,31 +129,29 @@ int commserver(void)
             return 1;
         }
 
+	int total = 0;
+	
         // recieve data and write to file
-        while(1)
+        while(total < meta_data.data_size)
         {
+	    nrecv=0;
             // first read file in chunks of buffer bytes
             int recv_writen = 0;
             //int valrecv = 0;
-            int valrecv = recv(new_conn_fd , buffer, sizeof(buffer), 0);
-            /*while (valrecv > 0){
-                valrecv = 0;
-                valrecv += recv(new_conn_fd , buffer, sizeof(buffer), 0);
-                recv_writen += fwrite(buffer, sizeof(char), valrecv, fp);
-            }*/
+            total += nrecv += recv(new_conn_fd , buffer, sizeof(buffer), 0);
             //printf("Bytes recieved %d \n", valrecv);        
             // if recv was success, write data to file.
-            if(valrecv > 0){
+            if(nrecv > 0){
                 //printf("Writing buffer to file \n");
-                recv_writen += fwrite(buffer, sizeof(char), valrecv, fp);
+                recv_writen += fwrite(buffer, sizeof(char), nrecv, fp);
             }
 
             //printf("Bytes writen %d \n", recv_writen);  
             // checking if everything was recieved or something is missing and an error occured 
-            if (valrecv < sizeof(buffer)){
+            if (total == meta_data.data_size){
                 fseek(fp, 0, SEEK_END); // seek to end of file
                 int recieved_fsize = ftell(fp);   // get current file pointer
-                printf("recieveddata: %d , %d, metafilesize: %d to filename: %s \n" , (recv_writen*sizeof(char)), recieved_fsize, meta_data.data_size, meta_data.data_name);
+                //printf("recieveddata: %d , %d, metafilesize: %d to filename: %s \n" , (recv_writen*sizeof(char)), recieved_fsize, meta_data.data_size, meta_data.data_name);
                 if (recieved_fsize == meta_data.data_size){
                     printf("finished transfer\n");
                     fflush(fp);
@@ -178,7 +176,7 @@ int commserver(void)
     
         }
 
-        printf("finished file transfer closing socket and waiting for new connection\n");
+        //printf("finished file transfer closing socket and waiting for new connection\n");
         close(new_conn_fd);
     }
 
@@ -195,12 +193,13 @@ int commclient(char *path, char *position, char *server_ip)
     struct sockaddr_in serv_addr;
     int client_fd = 0, length; //data_size;
     char buffer[1024] = {0};
-    char *serv_ip; // = "127.0.0.1";
+    //char *serv_ip; // = "127.0.0.1";
     comm_socket_header_t meta_data;
     // char *data_name, *data_position;
     //char name_arg[1024];
     struct stat st = {0};
 
+/*
     printf("\nServer_IP: %s serv %s\n", server_ip, serv_ip);
 
     if (server_ip)
@@ -212,7 +211,7 @@ int commclient(char *path, char *position, char *server_ip)
     //printf("start comm client \n");
     
     //printf("\nServ_IP: %s\n", serv_ip);
-    
+ */   
     // starting socket in IPv4 mode as AF_INET indicates
     if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
         printf("\n Socket creation error \n");
@@ -224,13 +223,13 @@ int commclient(char *path, char *position, char *server_ip)
     serv_addr.sin_port = htons(PORT);
       
     // Convert IPv4 (and IPv6) addresses from text to binary form
-    if(inet_pton(AF_INET, serv_ip, &serv_addr.sin_addr)<=0) {
+    if(inet_pton(AF_INET, server_ip, &serv_addr.sin_addr)<=0) {
         printf("\nInvalid address/ Address not supported \n");
         return -1;
     }
     
     //needed to be add as otherwise server hasn't socket open in time
-    usleep(50);
+    usleep(300);
     int try=0;
     retry:
     // Connect to Server with assambeled information in struct serv_addr
@@ -255,7 +254,7 @@ int commclient(char *path, char *position, char *server_ip)
     if (strcmp(meta_data.data_name,"finished")==0) {
             printf("all checkpoint files send\n");
             meta_data.data_size=0;
-            printf("metafilesize: %d to filename: %s and position: %s \n " , meta_data.data_size, meta_data.data_name, meta_data.data_position);
+            //printf("metafilesize: %d to filename: %s and position: %s \n " , meta_data.data_size, meta_data.data_name, meta_data.data_position);
             
             // sending only meta information to inform server of finished transfer
             int nsent=0;
@@ -281,7 +280,7 @@ int commclient(char *path, char *position, char *server_ip)
     rewind(fp); // set file pointer back to start of file
    
     
-    printf("metafilesize: %d to filename: %s and position: %s \n " , meta_data.data_size, meta_data.data_name, meta_data.data_position);
+    //printf("metafilesize: %d to filename: %s and position: %s \n " , meta_data.data_size, meta_data.data_name, meta_data.data_position);
     // sending file meta information to server before sending file
     int nsent=0;
     while (nsent < sizeof(meta_data))
@@ -291,37 +290,39 @@ int commclient(char *path, char *position, char *server_ip)
         exit(EXIT_FAILURE);
     }
 
-        
+    int total=0;   
     // read data from file and send it
-    while(1)
+    while(total < meta_data.data_size)
     {
-        
+       
         // reading file in chunks of buffer bytes
         int nread = fread(buffer,sizeof(char),sizeof(buffer),fp);
         //printf("Bytes read %d \n", nread);        
 
         // succesive reading leads to sending the data. 
         if(nread > 0){
+	    nsent=0;
             //printf("Sending \n");
-            send(client_fd, buffer, nread, 0);
+            while (nsent < nread)
+                total += nsent += send(client_fd,((char*)&buffer)+nsent, nread-nsent, 0);
         }
 
         // checking if end of file was reached or error occured     
-        if (nread < sizeof(buffer)){
+        if (total == meta_data.data_size){
             if (feof(fp))
                 printf("End of file\n");
             if (ferror(fp)){
                 printf("Error reading from file\n");
                 perror("Sending buffer error");
             }
-            printf("Closing file descriptor and socket file descriptor\n");
-            fclose(fp);
+            //printf("Closing file descriptor and socket file descriptor\n");
+            //fclose(fp);
             //printf("after fclose(fp) before break\n");
-            break;
         }
 
     }
-
+    //printf("Closing file descriptor and socket file descriptor\n");
+    fclose(fp);
     close(client_fd);
     //printf("after client_fd closed before return\n");
     return 0;

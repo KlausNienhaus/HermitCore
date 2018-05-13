@@ -1565,7 +1565,9 @@ nextslot:
 				//printf(mem_files);
 				commclient(mem_files, "checkpoint", comm_new_host);
 			}
+		//printf("before sending finished\n");
 		commclient("finished", "checkpoint", comm_new_host);
+		//printf("before recieving migration confirm received\n");
 		commserver();
 		printf("Client transfered checkpoint and stops execution now\n");
 		sigterm_handler(SIGTERM);

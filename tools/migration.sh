@@ -15,9 +15,9 @@ fi
 
 mkdir offlinemigration
 
-file_empty="offlinemigration/offlinemig_uhyve_empty.log"
-file_250="offlinemigration/offlinemig_uhyve_250.log"
-file_500="offlinemigration/offlinemig_uhyve_500.log" 
+file_empty="offlinemigration/offlinemig_uhyve_0,00.log"
+file_250="offlinemigration/offlinemig_uhyve_0,25.log"
+file_500="offlinemigration/offlinemig_uhyve_0,50.log" 
 file_1="offlinemigration/offlinemig_uhyve_1.log"
 file_2="offlinemigration/offlinemig_uhyve_2.log"  
 file_4="offlinemigration/offlinemig_uhyve_4.log"
@@ -43,7 +43,7 @@ until [ $counter -eq $iterations ]; do
     echo "$migtime"  >> $file_empty
     echo "migration $counter time $migtime"
     let counter+=1
-    sleep 2
+    sleep 3
     done
 
 counter=0;
@@ -63,7 +63,7 @@ until [ $counter -eq $iterations ]; do
     echo "$migtime"  >> $file_250
     echo "migration $counter time $migtime"
     let counter+=1
-    sleep 2
+    sleep 3
     done
 
 counter=0;
@@ -83,7 +83,7 @@ until [ $counter -eq $iterations ]; do
     echo "$migtime"  >> $file_500
     echo "migration $counter time $migtime"
     let counter+=1
-    sleep 2
+    sleep 3
     done
 
 counter=0;
@@ -103,7 +103,7 @@ until [ $counter -eq $iterations ]; do
     echo "$migtime"  >> $file_1
     echo "migration $counter time $migtime"
     let counter+=1
-    sleep 2
+    sleep 3
     done
 
 counter=0;
@@ -123,7 +123,7 @@ until [ $counter -eq $iterations ]; do
     echo "$migtime"  >> $file_2
     echo "migration $counter time $migtime"
     let counter+=1
-    sleep 2
+    sleep 3
     done
 
     # HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=127.0.0.1 COMM_ORIGIN=127.0.0.1 HERMIT_MEM=8G bin/proxy x86_64-hermit/extra/tests/migration_test8 
