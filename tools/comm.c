@@ -83,8 +83,8 @@ return 0;
 
 int comm_client_disconnect()
 {
-if(client_chunk_fd)
-    close(client_chunk_fd);
+//if(client_chunk_fd)
+close(client_chunk_fd);
 return 0;
 }
 
@@ -877,6 +877,7 @@ int comm_chunk_server(uint8_t* mem)
     printf("Received memory in %zd us\n", usec);*/
 
     //printf("Memory for migration recieved returning to loading process\n");
+    close(new_conn_fd); 
     close(server_fd);
     return 0;
 }
