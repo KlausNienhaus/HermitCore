@@ -32,10 +32,10 @@
 #include "comm.h"
 
 
-#define maxtry 50
-#define retytime 10
+#define maxtry 10
+#define retytime 1000
 size_t memory_chunk=0;
-int client_chunk_fd = 0;
+int client_fd = 0, server_fd = 0, new_conn_fd = 0;
 //static uint8_t *guest_mem = NULL;
 //size_t* pgt;
 
@@ -47,12 +47,12 @@ int comm_client_connect(char *server_ip)
 
     //unsigned long masksize;
     comm_socket_header_t meta_data = {0};
-    struct timeval begin, end, chunk_begin, chunk_end, connect_start; // wait_end;
-    gettimeofday(&begin, NULL);
+    //struct timeval begin, end, chunk_begin, chunk_end, connect_start; // wait_end;
+    //gettimeofday(&begin, NULL);
 
       
     // starting socket in IPv4 mode as AF_INET indicates
-    if ((client_chunk_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
+    if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
         printf("Socket creation error \n");
         exit(EXIT_FAILURE);
     }
@@ -68,13 +68,13 @@ int comm_client_connect(char *server_ip)
         exit(EXIT_FAILURE);
     }
 
-    gettimeofday(&connect_start, NULL);
+    //gettimeofday(&connect_start, NULL);
     //needed to be add as otherwise server hasn't socket open in time
-    usleep(1);
+    //usleep(100);
     int try=0;
     retry:
     // Connect to Server with assambeled information in struct serv_addr
-    if (connect(client_chunk_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0){
+    if (connect(client_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0){
         if (try<maxtry){
                 usleep(retytime);
                 try++;
@@ -89,8 +89,56 @@ int comm_client_connect(char *server_ip)
 
 int comm_client_disconnect()
 {
-    if(client_chunk_fd)
-        close(client_chunk_fd);
+    close(client_fd);
+    return 0;
+}
+
+int comm_server_accept()
+{
+    //int server_fd, new_conn_fd; //data_size;
+    struct sockaddr_in address;
+    int opt = 1, filesrecv = 0, addrlen = sizeof(address);
+    // creating socket file descriptor
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0){
+        perror("Socket failed\n");
+        exit(EXIT_FAILURE);
+    }
+    
+    // enable reuse of port and address
+    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))){
+        perror("setsockopt failed");
+        exit(EXIT_FAILURE);
+    }
+    
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons( PORT );
+      
+    // attaching socket to the port
+    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address))<0){
+        perror("bind failed\n");
+        exit(EXIT_FAILURE);
+    }
+    // start listening to incomming TCP connections on port
+    if (listen(server_fd, 10) < 0){
+        perror("listen failed\n");
+        exit(EXIT_FAILURE);
+    }
+    //printf("waiting on connection by listen in mem chunk server \n");
+    //gettimeofday(&wait_start, NULL);
+    if ((new_conn_fd = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0){
+        perror("accept failed\n");
+        exit(EXIT_FAILURE);
+    }
+    return 0;
+}
+
+int comm_server_close()
+{
+    //if(new_conn_fd)
+    close(new_conn_fd);
+    //if(server_fd)
+    close(server_fd);
     return 0;
 }
 
@@ -99,7 +147,7 @@ int comm_client_disconnect()
 //          atm recieves data file from client (e.g. checkpoint)
 int commserver(void)
 {
-    int server_fd, new_conn_fd; //data_size;
+    //int server_fd, new_conn_fd; //data_size;
     struct sockaddr_in address;
     int opt = 1, filesrecv = 0, addrlen = sizeof(address);
     char buffer[1024]= {0};
@@ -226,7 +274,7 @@ int commclient(char *path, char *position, char *server_ip)
 {
     struct sockaddr_in address;
     struct sockaddr_in serv_addr;
-    int client_fd = 0; //data_size;
+    //int client_fd = 0; //data_size;
     char buffer[1024] = {0};
     comm_socket_header_t meta_data;
 
@@ -320,12 +368,13 @@ int commclient(char *path, char *position, char *server_ip)
 
 int comm_config_server(comm_config_t *checkpoint_config)
 {
-    int server_fd, new_conn_fd; //data_size;
-    struct sockaddr_in address;
-    int opt = 1, addrlen = sizeof(address);
-    char buffer[1024]= {0};
+    //int server_fd, new_conn_fd; //data_size;
+    //struct sockaddr_in address;
+    //int opt = 1, addrlen = sizeof(address);
+    //char buffer[1024]= {0};
     comm_socket_header_t meta_data = {0};
 
+    /*
     // creating socket file descriptor
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0){
         perror("socket failed\n");
@@ -361,6 +410,7 @@ int comm_config_server(comm_config_t *checkpoint_config)
         perror("accept failed\n");
         exit(EXIT_FAILURE);
     }
+    */
     
     //recieving metadata for data type and control information
     int nrecv = 0;
@@ -385,10 +435,10 @@ int comm_config_server(comm_config_t *checkpoint_config)
         close(server_fd);
         exit(EXIT_FAILURE);
     }
-    close(new_conn_fd);   
+    //close(new_conn_fd);   
 
     printf("Config for migration recieved\n");
-    close(server_fd);
+    //close(server_fd);
     return 0;
 }
 
@@ -396,16 +446,17 @@ int comm_config_server(comm_config_t *checkpoint_config)
 //          atm sends Config to server (e.g. checkpoint)
 int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *comm_type, char *comm_subtype)
 {
-    struct sockaddr_in address;
-    struct sockaddr_in serv_addr;
-    int client_fd = 0; //data_size;
-    char buffer[1024] = {0};
+    //struct sockaddr_in address;
+    //struct sockaddr_in serv_addr;
+    //int client_fd = 0; //data_size;
+    //char buffer[1024] = {0};
     comm_socket_header_t meta_data;
     //comm_type = "config";
-    struct timeval begin, end; // config_begin, config_end;
+    //struct timeval begin, end; // config_begin, config_end;
 
-    gettimeofday(&begin, NULL);
+    //gettimeofday(&begin, NULL);
   
+    /*
     // starting socket in IPv4 mode as AF_INET indicates
     if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
         printf("Socket creation error \n");
@@ -421,6 +472,7 @@ int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *
         printf("Invalid address/ Address not supported \n");
         exit(EXIT_FAILURE);
     }
+
     //usleep(1);
     int try=0;
     retry1:
@@ -433,7 +485,7 @@ int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *
             }   
         printf("Connection Failed \n");
         exit(EXIT_FAILURE);
-    }
+    }*/
     
     //data_name and data_position in this case codes the type of transfer comming for comm_server
     strcpy(meta_data.data_name, comm_type);
@@ -458,11 +510,11 @@ int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *
     }
   
     //printf("Config for migration send \n");
-    close(client_fd);
-    gettimeofday(&end, NULL);
-	size_t usec = (end.tv_sec - begin.tv_sec) * 1000000;
-	usec += (end.tv_usec - begin.tv_usec);
-    printf("Send Config in %zd us\n", usec);
+    //close(client_fd);
+    //gettimeofday(&end, NULL);
+	//size_t usec = (end.tv_sec - begin.tv_sec) * 1000000;
+	//usec += (end.tv_usec - begin.tv_usec);
+    //printf("Send Config in %zd us\n", usec);
 
     return 0;
 }
@@ -470,13 +522,13 @@ int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *
 
 int comm_register_server(comm_register_t *vcpu_register, uint32_t *cpuid, uint32_t *ncores)
 {
-    int server_fd, new_conn_fd; //data_size;
-    struct sockaddr_in address;
-    int opt = 1, filesrecv = 0, addrlen = sizeof(address);
-    char buffer[1024]= {0};
+    //int server_fd, new_conn_fd; //data_size;
+    //struct sockaddr_in address;
+    //int opt = 1, filesrecv = 0, addrlen = sizeof(address);
+    //char buffer[1024]= {0};
     comm_socket_header_t meta_data = {0};
 
-
+    /*
     // creating socket file descriptor
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0){
         perror("socket failed\n");
@@ -511,7 +563,7 @@ int comm_register_server(comm_register_t *vcpu_register, uint32_t *cpuid, uint32
     if ((new_conn_fd = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0){
         perror("accept failed\n");
         exit(EXIT_FAILURE);
-    }
+    }*/
     
     //recieving metadata for data type and control information
     int nrecv = 0;
@@ -519,6 +571,8 @@ int comm_register_server(comm_register_t *vcpu_register, uint32_t *cpuid, uint32
         nrecv += recv(new_conn_fd, (void*)((char*)&meta_data)+nrecv, sizeof(meta_data)-nrecv, 0);            
     if (nrecv < sizeof(meta_data)){
         perror("Meta_data not correct received in register_server \n");
+        close(new_conn_fd);
+        close(server_fd);
         exit(EXIT_FAILURE);
     }
 
@@ -534,12 +588,12 @@ int comm_register_server(comm_register_t *vcpu_register, uint32_t *cpuid, uint32
         close(server_fd); 
         exit(EXIT_FAILURE);
     }
-    close(new_conn_fd);     
+    //close(new_conn_fd);     
 
 
     
     printf("Register for migration recieved\n");
-    close(server_fd);
+    //close(server_fd);
     return 0;
 }
 
@@ -548,16 +602,17 @@ int comm_register_server(comm_register_t *vcpu_register, uint32_t *cpuid, uint32
 //          atm sends data file to server (e.g. checkpoint)
 int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32_t *ncores, char *server_ip, char *comm_type, char *comm_subtype)
 {
-    struct sockaddr_in address;
-    struct sockaddr_in serv_addr;
-    int client_fd = 0; //data_size;
-    char buffer[1024] = {0};
+    //struct sockaddr_in address;
+    //struct sockaddr_in serv_addr;
+    //int client_fd = 0; //data_size;
+    //char buffer[1024] = {0};
     comm_socket_header_t meta_data;
     //char *comm_type = "register";
-    struct timeval begin, end; // config_begin, config_end;
+    //struct timeval begin, end; // config_begin, config_end;
 
-    gettimeofday(&begin, NULL);
+    //gettimeofday(&begin, NULL);
     
+    /*
     // starting socket in IPv4 mode as AF_INET indicates
     if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
         printf("Socket creation error \n");
@@ -588,6 +643,8 @@ int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32
         exit(EXIT_FAILURE);
     }
 
+    */
+
     //path in this case codes the type of transfer comming
     strcpy(meta_data.data_name, comm_type);
     //printf("Register meta data name, %s \n", meta_data.data_name);
@@ -600,6 +657,7 @@ int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32
         nsent += send(client_fd, (void*)((char*)&meta_data)+nsent, sizeof(meta_data)-nsent,0);
     if (nsent < (sizeof(meta_data))){
         perror("Meta_data not correct send in register_client\n");
+        close(client_fd);
         exit(EXIT_FAILURE);
     }
 
@@ -612,15 +670,13 @@ int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32
             exit(EXIT_FAILURE);
         } 
     
-    //printf("In comm_register_client send size %d vcpu_register->regs %d vcpu_register->lapic %d\n",sizeof(*vcpu_register),vcpu_register->regs, vcpu_register->lapic);
-    //printf("In comm_register_client send size %d vcpu_register[*cpuid].regs %d vcpu_register[*cpuid].lapic %d\n",vcpu_register[*cpuid].regs, vcpu_register[*cpuid].lapic);
 
     //printf("Register for migration send\n");
-    close(client_fd);
-    gettimeofday(&end, NULL);
-		size_t usec = (end.tv_sec - begin.tv_sec) * 1000000;
-		usec += (end.tv_usec - begin.tv_usec);
-    printf("Send register in %zd us\n", usec);
+    //close(client_fd);
+    //gettimeofday(&end, NULL);
+	//size_t usec = (end.tv_sec - begin.tv_sec) * 1000000;
+	//usec += (end.tv_usec - begin.tv_usec);
+    //printf("Send register in %zd us\n", usec);
     return 0;
 }
 
@@ -628,53 +684,23 @@ int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32
 
 int comm_clock_server(struct kvm_clock_data *clock)
 {
-    int server_fd, new_conn_fd; //data_size;
-    struct sockaddr_in address;
-    int opt = 1, filesrecv = 0, addrlen = sizeof(address);
-    char buffer[1024]= {0};
+    //int server_fd, new_conn_fd; //data_size;
+    //struct sockaddr_in address;
+    //int opt = 1, filesrecv = 0, addrlen = sizeof(address);
+    //char buffer[1024]= {0};
     comm_socket_header_t meta_data = {0};
-
-    // creating socket file descriptor
-    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0){
-        perror("socket failed\n");
-        exit(EXIT_FAILURE);
-    }
     
-    // enable reuse of port and address
-    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))){
-        perror("setsockopt failed");
-        exit(EXIT_FAILURE);
-    }
-    
+    //needed to be added to wait on initialised VM on server side
+    usleep(500);
 
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons( PORT );
-      
-    // attaching socket to the port
-    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address))<0){
-        perror("bind failed\n");
-        exit(EXIT_FAILURE);
-    }
-    // start listening to incomming TCP connections on port
-    if (listen(server_fd, 3) < 0){
-        perror("listen failed\n");
-        exit(EXIT_FAILURE);
-    }
-    //printf("clock_server waiting on connection by listen \n");
-
-
-    if ((new_conn_fd = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0){
-        perror("accept failed\n");
-        exit(EXIT_FAILURE);
-    }
-    
     //recieving metadata for data type and control information
     int nrecv = 0;
     while (nrecv < sizeof(meta_data))
         nrecv += recv(new_conn_fd, (void*)((char*)&meta_data)+nrecv, sizeof(meta_data)-nrecv, 0);            
     if (nrecv < (sizeof(meta_data))){
         perror("Meta_data not correct received in clock_server \n");
+        close(new_conn_fd);
+        close(server_fd);
         exit(EXIT_FAILURE);
     }
     //printf("In clock_server metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
@@ -683,19 +709,20 @@ int comm_clock_server(struct kvm_clock_data *clock)
         int nrecv = 0;
         while (nrecv<sizeof(*clock))
             nrecv += recv(new_conn_fd,(void*)((char*)clock)+nrecv, sizeof(*clock)-nrecv, 0);
-        if (nrecv<(sizeof(*clock)))
+        if (nrecv<(sizeof(*clock))){
             perror("Clock recieved incomplete\n");
+            close(new_conn_fd);
+            close(server_fd);
+            exit(EXIT_FAILURE);
+        }
     } else {
         printf("Wrong meta_data %s in clock recieved", meta_data.data_name);
         close(new_conn_fd);
         close(server_fd);
         exit(EXIT_FAILURE);
     }
-    close(new_conn_fd);
-
 
     printf("Clock for migration recieved\n");
-    close(server_fd);
     return 0;
 }
 
@@ -703,18 +730,18 @@ int comm_clock_server(struct kvm_clock_data *clock)
 //          atm sends clock to server (e.g. checkpoint)
 int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_type, char *comm_subtype)
 {
-    struct sockaddr_in address;
-    struct sockaddr_in serv_addr;
-    int client_fd = 0; //data_size;
-    char buffer[1024] = {0};
+    //struct sockaddr_in address;
+    //struct sockaddr_in serv_addr;
+    //int client_fd = 0; //data_size;
+    //char buffer[1024] = {0};
     comm_socket_header_t meta_data;
-    struct timeval begin, end; // config_begin, config_end;
-    gettimeofday(&begin, NULL);
+    //struct timeval begin, end; // config_begin, config_end;
+    //gettimeofday(&begin, NULL);
     
     //printf("start comm client \n"); 
     
     // starting socket in IPv4 mode as AF_INET indicates
-    if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
+    /*if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
         printf("Socket creation error \n");
         exit(EXIT_FAILURE);
     }
@@ -730,7 +757,7 @@ int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_
     }
 
     //needed to be add as otherwise server hasn't socket open in time
-    usleep(40);
+    usleep(80);
     int try=0;
     retry3:
     // Connect to Server with assambeled information in struct serv_addr
@@ -743,7 +770,7 @@ int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_
             
         printf("Connection Failed in clock client \n");
         exit(EXIT_FAILURE);
-    }
+    }*/
     //printf("clock_client connected\n");
 
     //data_name and data_position in this case codes the type of transfer comming for comm_server
@@ -757,6 +784,7 @@ int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_
         nsent += send(client_fd, (void*)((char*)&meta_data)+nsent, sizeof(meta_data)-nsent,0);
     if (nsent < (sizeof(meta_data))){
         perror("Meta_data not correct send in clock_client\n");
+        close(client_fd);
         exit(EXIT_FAILURE);
     }
 
@@ -768,15 +796,16 @@ int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_
     }
     if (nsent < (sizeof(*clock))){
             perror("Clock not correct send \n");
+            close(client_fd);
             exit(EXIT_FAILURE);
         } 
     
     //printf("Clock for migration send\n");
-    close(client_fd);
-    gettimeofday(&end, NULL);
-	size_t usec = (end.tv_sec - begin.tv_sec) * 1000000;
-	usec += (end.tv_usec - begin.tv_usec);
-    printf("Send clock in %zd us\n", usec);
+    //close(client_fd);
+    //gettimeofday(&end, NULL);
+	//size_t usec = (end.tv_sec - begin.tv_sec) * 1000000;
+	//usec += (end.tv_usec - begin.tv_usec);
+    //printf("Send clock in %zd us\n", usec);
     return 0;
 }
 
@@ -784,51 +813,20 @@ int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_
 //@brief: recieves memory_chunks until all parts have been recieved and are aligned back together to a bigger memory image
 int comm_chunk_server(uint8_t* mem)
 {
-    int server_fd, new_conn_fd; //data_size;
-    struct sockaddr_in address;
-    int opt = 1, filesrecv = 0, addrlen = sizeof(address);
-    char buffer[1024]= {0};
+    //int server_fd, new_conn_fd; //data_size;
+    //struct sockaddr_in address;
+    //int opt = 1, filesrecv = 0, addrlen = sizeof(address);
+    //char buffer[1024]= {0};
     size_t location;
     size_t memorypart=0;
     //unsigned long masksize;
     comm_socket_header_t meta_data = {0};
-    struct timeval begin, end, chunk_begin, chunk_end, wait_start; // wait_end;
-    gettimeofday(&begin, NULL);
+    //struct timeval begin, end, chunk_begin, chunk_end; //wait_start; // wait_end;
+    //gettimeofday(&begin, NULL);
 
 
-    // creating socket file descriptor
-    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0){
-        perror("Socket failed\n");
-        exit(EXIT_FAILURE);
-    }
-    
-    // enable reuse of port and address
-    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))){
-        perror("setsockopt failed");
-        exit(EXIT_FAILURE);
-    }
-    
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons( PORT );
-      
-    // attaching socket to the port
-    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address))<0){
-        perror("bind failed\n");
-        exit(EXIT_FAILURE);
-    }
-    // start listening to incomming TCP connections on port
-    if (listen(server_fd, 10) < 0){
-        perror("listen failed\n");
-        exit(EXIT_FAILURE);
-    }
-    //printf("waiting on connection by listen in mem chunk server \n");
-    gettimeofday(&wait_start, NULL);
-    if ((new_conn_fd = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0){
-        perror("accept failed\n");
-        exit(EXIT_FAILURE);
-    }
-    gettimeofday(&chunk_begin, NULL);
+
+    //gettimeofday(&chunk_begin, NULL);
 
     while(1){
         //recieving metadata for data type and control information
@@ -884,7 +882,7 @@ int comm_chunk_server(uint8_t* mem)
                 exit(EXIT_FAILURE);
             }
         }else if((strcmp(meta_data.data_name,"mem")==0) && (strcmp(meta_data.data_position,"finished")==0)){
-            close(new_conn_fd); 
+            //close(new_conn_chunk_fd); 
             break;
         } else {
             perror("data_name in chunk_server wrong %s\n");
@@ -893,24 +891,24 @@ int comm_chunk_server(uint8_t* mem)
             exit(EXIT_FAILURE);
         }
 
-        gettimeofday(&chunk_end, NULL);
-        size_t usec = (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
-	    usec += (chunk_end.tv_usec - chunk_begin.tv_usec);
-        size_t wait_usec = (chunk_begin.tv_sec - wait_start.tv_sec) * 1000000;
-	    wait_usec += (chunk_begin.tv_usec - wait_start.tv_usec);
-        memorypart++;
-        printf("Received memory chunk %d in %zd us and waited for %zd us\n", memorypart, usec, wait_usec);
+        //gettimeofday(&chunk_end, NULL);
+        //size_t usec = (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
+	    //usec += (chunk_end.tv_usec - chunk_begin.tv_usec);
+        //size_t wait_usec = (chunk_begin.tv_sec - wait_start.tv_sec) * 1000000;
+	    //wait_usec += (chunk_begin.tv_usec - wait_start.tv_usec);
+        //memorypart++;
+        //printf("Received memory chunk %d in %zd us \n", memorypart, usec);
         //printf("memorypart %d recieved. \n ", memorypart);
         //close(new_conn_fd);
     }
           
-    gettimeofday(&end, NULL);
-	size_t usec = (end.tv_sec - begin.tv_sec) * 1000000;
-	usec += (end.tv_usec - begin.tv_usec);
-    printf("Received memory in %zd us\n", usec);
+    //gettimeofday(&end, NULL);
+	//size_t usec = (end.tv_sec - begin.tv_sec) * 1000000;
+	//usec += (end.tv_usec - begin.tv_usec);
+    //printf("Received memory in %zd us\n", usec);
 
     printf("Memory for migration recieved returning to loading process\n");
-    close(server_fd);
+    //close(server_chunk_fd);
     return 0;
 }
 
@@ -921,14 +919,14 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char 
     //struct sockaddr_in address;
     //struct sockaddr_in serv_addr;
     //int client_chunk_fd = 0; //data_size;
-    char buffer[1024] = {0};
+    //char buffer[1024] = {0};
 
     //unsigned long masksize;
     comm_socket_header_t meta_data = {0};
-    struct timeval begin, end, chunk_begin, chunk_end, connect_start; // wait_end
+    //struct timeval begin, end, chunk_begin, chunk_end, connect_start; // wait_end
 
     
-    gettimeofday(&chunk_begin, NULL);
+    //gettimeofday(&chunk_begin, NULL);
     //data_name and data_position in this case codes the type of transfer comming for comm_server
     strcpy(meta_data.data_name, comm_type);
     strcpy(meta_data.data_position, comm_subtype);
@@ -942,9 +940,10 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char 
     //sending metadata for data type and control information
     int nsent=0;
     while (nsent < sizeof(meta_data))
-        nsent += send(client_chunk_fd, (void*)((char*)&meta_data)+nsent, sizeof(meta_data)-nsent,0);
+        nsent += send(client_fd, (void*)((char*)&meta_data)+nsent, sizeof(meta_data)-nsent,0);
     if (nsent < (sizeof(meta_data))){
         perror("Meta_data not correct send in chunk_client\n");
+        close(client_fd);
         exit(EXIT_FAILURE);
     }
 
@@ -954,34 +953,35 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char 
         int nsent=0;
         int total=0;
         while (nsent < sizeof(size_t))
-            total+= nsent += send(client_chunk_fd, (void*)((char*)pgdpgt)+nsent, sizeof(size_t)-nsent, 0);
+            total+= nsent += send(client_fd, (void*)((char*)pgdpgt)+nsent, sizeof(size_t)-nsent, 0);
         //printf("chunk_client nsent %d sizeof(size_t) %d\n", nsent, sizeof(size_t));
         nsent=0;
         if (strcmp(meta_data.data_position,"PAGE_BITS")==0){
             while(nsent<(1UL << PAGE_BITS))
-                total += nsent += send(client_chunk_fd, (void*)((size_t)mem_chunck)+nsent, (1UL << PAGE_BITS)-nsent, 0);
+                total += nsent += send(client_fd, (void*)((size_t)mem_chunck)+nsent, (1UL << PAGE_BITS)-nsent, 0);
                 //printf("nsent %d Page_Bits %d\n", nsent, (1UL << PAGE_BITS));
                 chunk_size=(1UL << PAGE_BITS);
-                gettimeofday(&chunk_end, NULL);
+                //gettimeofday(&chunk_end, NULL);
             } else if (strcmp(meta_data.data_position,"PAGE_2M_BITS")==0){
                 while(nsent<(1UL << PAGE_2M_BITS))
-                    total += nsent += send(client_chunk_fd, (void*)((size_t)mem_chunck)+nsent, (1UL << PAGE_2M_BITS)-nsent, 0);
+                    total += nsent += send(client_fd, (void*)((size_t)mem_chunck)+nsent, (1UL << PAGE_2M_BITS)-nsent, 0);
                 //printf("nsent %d Page_2M %d\n", nsent, (1UL << PAGE_2M_BITS));
                 chunk_size=(1UL << PAGE_2M_BITS);
-                gettimeofday(&chunk_end, NULL);
+                //gettimeofday(&chunk_end, NULL);
             } else if (strcmp(meta_data.data_position,"PAGE_SIZE")==0) {
                 while(nsent<PAGE_SIZE)
-                    total += nsent += send(client_chunk_fd, (void*)((size_t)mem_chunck)+nsent, PAGE_SIZE-nsent, 0);
+                    total += nsent += send(client_fd, (void*)((size_t)mem_chunck)+nsent, PAGE_SIZE-nsent, 0);
                 //printf("nsent %d Page_Size %d\n", nsent, PAGE_SIZE);
                 chunk_size=PAGE_SIZE;
-                gettimeofday(&chunk_end, NULL);
+                //gettimeofday(&chunk_end, NULL);
             } else {
                 printf("ChunkSize in meta_data wrong in comm_chunk_client \n");
-                close(client_chunk_fd);
+                close(client_fd);
                 exit(EXIT_FAILURE);
             }
             if (total < (sizeof(size_t)+chunk_size)){
                 perror("Memory not correct send \n");
+                close(client_fd);
                 exit(EXIT_FAILURE);
             }
     } else if ((strcmp(meta_data.data_name,"mem")==0) && (strcmp(meta_data.data_position,"finished")==0)) {
@@ -993,17 +993,17 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char 
         return 0;
     } else {
         perror("transfer type in Data_Name wrong in comm_chunk_client\n");
-        close(client_chunk_fd);
+        close(client_fd);
         exit(EXIT_FAILURE);
     }
 
-    gettimeofday(&end, NULL);
-    size_t usec = (end.tv_sec - begin.tv_sec) * 1000000;
-	usec += (end.tv_usec - begin.tv_usec);
-    size_t chunk_usec = (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
-	chunk_usec += (chunk_end.tv_usec - chunk_begin.tv_usec);
-    memory_chunk++;
-    printf("Transferred memory chunk %d in %zd us and chunk_transfer time %zd us \n", memory_chunk, usec, chunk_usec);
+    //gettimeofday(&end, NULL);
+    //size_t usec = (end.tv_sec - begin.tv_sec) * 1000000;
+	//usec += (end.tv_usec - begin.tv_usec);
+    //size_t chunk_usec = (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
+	//chunk_usec += (chunk_end.tv_usec - chunk_begin.tv_usec);
+    //memory_chunk++;
+    //printf("Transferred memory chunk %d in %zd us and chunk_transfer time %zd us \n", memory_chunk, usec, chunk_usec);
 
     //close(client_chunk_fd);
     return 0;

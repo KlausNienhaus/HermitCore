@@ -11,49 +11,28 @@ else
     iterations="$3";
 fi
 
-file_empty="coldmig_uhyve_empty.log"
-file_250="coldmig_uhyve_250.log"
-file_500="coldmig_uhyve_500.log" 
-file_1="coldmig_uhyve_1.log"  
+
+
+mkdir coldmigration
+
+file_empty="coldmigration/coldmig_uhyve_empty.log"
+file_250="coldmigration/coldmig_uhyve_250.log"
+file_500="coldmigration/coldmig_uhyve_500.log" 
+file_1="coldmigration/coldmig_uhyve_1.log"
+file_2="coldmigration/coldmig_uhyve_2.log"  
+file_4="coldmigration/coldmig_uhyve_4.log"
+file_8="coldmigration/coldmig_uhyve_8.log"
+file_16="coldmigration/coldmig_uhyve_16.log"  
 
 #echo "cold migration" >> $file_empty
+#waittonext = 6
 counter=0;
 until [ $counter -eq $iterations ]; do
-    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1
+    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1 HERMIT_MEM=30M
 	
      
     bin/proxy x86_64-hermit/extra/tests/migration_test0 & sleep 2 
-    kill -10 $! & start="$(date -u +%s.%N)"
-    start2="$(date +%s.%N)"	
-    if [ $? -ne 0 ]; then
-       echo "migration proccess encountered an error";
-       exit 1;	
-    fi 
-    wait
-    stop="$(date -u +%s.%N)"
-    start3="$(date +%s.%N)"
-    END=$(echo "$(date -u +%s.%N) - $start" | bc)
-    migtime=$(bc <<< "$stop - $start")
-    echo -n "$migtime"  >> $file_empty
-    migtime2=$(bc <<< "$stop - $start2")
-    echo "      $migtime2"  >> $file_empty
-    echo "migration time $migtime"
-    echo "migration end $END"
-    END2=$(echo "$(date -u +%s.%N) - $start3" | bc) 
-    echo "migration end $END2"
-
-    let counter+=1
-    sleep 15
-    done
-
-counter=0;
-until [ $counter -eq $iterations ]; do
-    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1
-	
-   
-    bin/proxy x86_64-hermit/extra/tests/migration_test250 & sleep 2 
     kill -10 $! & start="$(date +%s.%N)"
-    start2="$(date +%s.%N)"	
     if [ $? -ne 0 ]; then
        echo "migration proccess encountered an error";
        exit 1;	
@@ -61,22 +40,39 @@ until [ $counter -eq $iterations ]; do
     wait
     stop="$(date +%s.%N)"
     migtime=$(bc <<< "$stop - $start")
-    echo -n "$migtime"  >> $file_250
-    migtime2=$(bc <<< "$stop - $start2")
-    echo "      $migtime2"  >> $file_250
-    echo "migration time $migtime"
+    echo "$migtime"  >> $file_empty
+    echo "migration $counter time $migtime"
     let counter+=1
-    sleep 15
+    sleep 5
     done
 
 counter=0;
 until [ $counter -eq $iterations ]; do
-    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1
+    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1 HERMIT_MEM=250M
+	
+   
+    bin/proxy x86_64-hermit/extra/tests/migration_test250 & sleep 2 
+    kill -10 $! & start="$(date +%s.%N)"	
+    if [ $? -ne 0 ]; then
+       echo "migration proccess encountered an error";
+       exit 1;	
+    fi 
+    wait
+    stop="$(date +%s.%N)"
+    migtime=$(bc <<< "$stop - $start")
+    echo "$migtime"  >> $file_250
+    echo "migration $counter time $migtime"
+    let counter+=1
+    sleep 5
+    done
+
+counter=0;
+until [ $counter -eq $iterations ]; do
+    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1 HERMIT_MEM=500M
 	
  
     bin/proxy x86_64-hermit/extra/tests/migration_test500 & sleep 2 
     kill -10 $! & start="$(date +%s.%N)"
-    start2="$(date +%s.%N)"	
     if [ $? -ne 0 ]; then
        echo "migration proccess encountered an error";
        exit 1;	
@@ -84,22 +80,19 @@ until [ $counter -eq $iterations ]; do
     wait
     stop="$(date +%s.%N)"
     migtime=$(bc <<< "$stop - $start")
-    echo -n "$migtime"  >> $file_500
-    migtime2=$(bc <<< "$stop - $start2")
-    echo "      $migtime2"  >> $file_500
-    echo "migration time $migtime"
+    echo "$migtime"  >> $file_500
+    echo "migration $counter time $migtime"
     let counter+=1
-    sleep 15
+    sleep 5
     done
 
 counter=0;
 until [ $counter -eq $iterations ]; do
-    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1
+    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1 HERMIT_MEM=1000M
 	
    
     bin/proxy x86_64-hermit/extra/tests/migration_test1 & sleep 2 
     kill -10 $! & start="$(date +%s.%N)"
-    start2="$(date +%s.%N)"	
     if [ $? -ne 0 ]; then
        echo "migration proccess encountered an error";
        exit 1;	
@@ -107,10 +100,30 @@ until [ $counter -eq $iterations ]; do
     wait
     stop="$(date +%s.%N)"
     migtime=$(bc <<< "$stop - $start")
-    echo -n "$migtime"  >> $file_1
-    migtime2=$(bc <<< "$stop - $start2")
-    echo "      $migtime2"  >> $file_1
-    echo "migration time $migtime"
+    echo "$migtime"  >> $file_1
+    echo "migration $counter time $migtime"
     let counter+=1
-    sleep 15
+    sleep 5
     done
+
+counter=0;
+until [ $counter -eq $iterations ]; do
+    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1 HERMIT_MEM=2000M
+	
+   
+    bin/proxy x86_64-hermit/extra/tests/migration_test2 & sleep 2 
+    kill -10 $! & start="$(date +%s.%N)"
+    if [ $? -ne 0 ]; then
+       echo "migration proccess encountered an error";
+       exit 1;	
+    fi 
+    wait
+    stop="$(date +%s.%N)"
+    migtime=$(bc <<< "$stop - $start")
+    echo "$migtime"  >> $file_2
+    echo "migration $counter time $migtime"
+    let counter+=1
+    sleep 5
+    done
+
+    # HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=127.0.0.1 COMM_ORIGIN=127.0.0.1 HERMIT_MEM=8G bin/proxy x86_64-hermit/extra/tests/migration_test8 

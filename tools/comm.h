@@ -113,8 +113,8 @@ typedef struct comm_config{
 int commserver(void);
 int commclient(char *path, char *position, char *server_ip);
 
-//int comm_server_accept();
-//int comm_server_disconnect();
+int comm_server_accept();
+int comm_server_close();
 
 int comm_client_connect(char *server_ip);
 int comm_client_disconnect();

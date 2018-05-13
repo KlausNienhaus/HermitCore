@@ -481,9 +481,10 @@ static int load_checkpoint(uint8_t* mem, char* path)
 
 		struct kvm_clock_data clock;
 		//printf("In load_checkpoint comm_clock_server next\n");
-		if 	(strncmp(comm_mode, "server", 6)==0 && !(hermit_check>0))
+		if 	(strncmp(comm_mode, "server", 6)==0 && !(hermit_check>0)){
+			//comm_server_accept();
 			comm_clock_server(&clock);
-		else if (fread(&clock, sizeof(clock), 1, f) != 1)
+		} else if (fread(&clock, sizeof(clock), 1, f) != 1)
 			err(1, "fread failed");
 		
 		// only the last checkpoint has to set the clock
@@ -501,6 +502,7 @@ static int load_checkpoint(uint8_t* mem, char* path)
 		//printf("In load_checkpoint comm_chunk_server next\n");
 		if 	(strncmp(comm_mode, "server", 6)==0 && !(hermit_check>0)){
 			comm_chunk_server(mem);
+			//comm_server_close();
 			checkpoint_recieved=true;
 			}
 		else {
@@ -1228,6 +1230,7 @@ int uhyve_init(char *path)
 	if 	((strncmp(comm_mode, "server", 6)==0) && (!(hermit_check>0)))
 	{
 		restart = true;
+		comm_server_accept();
 		comm_config_server(&config_struct);
 		ncores=config_struct.ncores;
 		guest_size=config_struct.guest_size;
@@ -1243,6 +1246,7 @@ int uhyve_init(char *path)
 			comm_vcpu_register = (comm_register_t*) calloc(ncores,sizeof(comm_register_t));
 		}
 		comm_register_server(comm_vcpu_register, &cpuid, &ncores);
+		//comm_server_close();
 	} else if ((strncmp(comm_mode, "server", 6)==0) && (hermit_check)){
 		if (f != NULL) {
 			int tmp = 0;
@@ -1416,6 +1420,9 @@ int uhyve_init(char *path)
 			exit(EXIT_FAILURE);
 	}
 
+	if 	((strncmp(comm_mode, "server", 6)==0) && (!(hermit_check>0)))
+		comm_server_close();
+
 	pthread_barrier_init(&barrier, NULL, ncores);
 	cpuid = 0;
 
@@ -1472,6 +1479,7 @@ static void timer_handler(int signum)
 		checkpoint_config.full_checkpoint=full_checkpoint;
 
 		gettimeofday(&config_begin, NULL);
+		comm_client_connect(comm_new_host);
 		comm_config_client(&checkpoint_config, comm_new_host, "config", "NULL");
 		gettimeofday(&config_end, NULL);
 		
@@ -1526,7 +1534,10 @@ static void timer_handler(int signum)
 	{
 		//for(int i=0;i<ncores;i++)
 			//printf("In timer_handler sending vcpu_register[cpuid].regs %d, vcpu_register[cpuid].lapic %d, (comm_vcpu_register+i)->regs , (comm_vcpu_register+i)->lapic\n", comm_vcpu_register[i].regs, comm_vcpu_register[i].lapic, (comm_vcpu_register+i)->regs, (comm_vcpu_register+i)->lapic);
+		
 		comm_register_client(comm_vcpu_register, &cpuid, &ncores, comm_new_host, "register", "NULL");
+		//comm_client_disconnect();
+		usleep(2000);
 
 		
 	}
@@ -1556,8 +1567,10 @@ static void timer_handler(int signum)
 	struct kvm_clock_data kvm_clock = {};
 	kvm_ioctl(vmfd, KVM_GET_CLOCK, &kvm_clock);
 	//printf("timer_hander sending clock over clock_client next\n");
-	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
+	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10){
+		//comm_client_connect(comm_new_host);
 		comm_clock_client(&kvm_clock, comm_new_host, "clock", "NULL");
+		}
 	if (hermit_check>0){
 		if (fwrite(&kvm_clock, sizeof(kvm_clock), 1, f) != 1)
 			err(1, "fwrite failed");
@@ -1568,8 +1581,8 @@ static void timer_handler(int signum)
 	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
 		gettimeofday(&memory_begin, NULL);
 
-	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
-		comm_client_connect(comm_new_host);
+	//if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
+	//	comm_client_connect(comm_new_host);
 #if 0
 	if (fwrite(guest_mem, guest_size, 1, f) != 1)
 		err(1, "fwrite failed");
@@ -1729,8 +1742,9 @@ nextslot:
 
 	if 	(strncmp(comm_mode, "client", 6)==0)
 	{
-
+		comm_server_accept();			
 		comm_chunk_server(NULL);
+		comm_server_close();
 		//mig_end = clock();
 		gettimeofday(&end, NULL);
 		size_t mig_time_spent = (end.tv_sec - begin.tv_sec) * 1000000;
