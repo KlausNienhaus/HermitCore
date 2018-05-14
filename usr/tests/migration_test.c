@@ -43,7 +43,7 @@
 int main(int argc, char** argv)
 {
     int zaehler_sleeps = 0;
-    uint16_t no_mb = 250;
+    uint16_t no_mb = 2000;
     //char (*memory) [no_mb*SIZE] = malloc(sizeof(*memory));
     int8_t *memory = (int8_t*) malloc(SIZE*no_mb);
     

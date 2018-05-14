@@ -108,7 +108,7 @@ until [ $counter -eq $iterations ]; do
 
 counter=0;
 until [ $counter -eq $iterations ]; do
-    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1 HERMIT_MEM=2100M
+    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1 HERMIT_MEM=2500M
 	
    
     bin/proxy x86_64-hermit/extra/tests/migration_test2 & sleep 2 
@@ -128,7 +128,7 @@ until [ $counter -eq $iterations ]; do
 
 counter=0;
 until [ $counter -eq $iterations ]; do
-    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1 HERMIT_MEM=4100M
+    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1 HERMIT_MEM=4500M
 	
    
     bin/proxy x86_64-hermit/extra/tests/migration_test4 & sleep 2 
