@@ -15,9 +15,9 @@ fi
 
 mkdir coldmigration
 
-file_empty="coldmigration/coldmig_uhyve_empty.log"
-file_250="coldmigration/coldmig_uhyve_250.log"
-file_500="coldmigration/coldmig_uhyve_500.log" 
+file_empty="coldmigration/coldmig_uhyve_0,00.log"
+file_250="coldmigration/coldmig_uhyve_0,25.log"
+file_500="coldmigration/coldmig_uhyve_0,50.log" 
 file_1="coldmigration/coldmig_uhyve_1.log"
 file_2="coldmigration/coldmig_uhyve_2.log"  
 file_4="coldmigration/coldmig_uhyve_4.log"

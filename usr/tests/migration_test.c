@@ -43,12 +43,12 @@
 int main(int argc, char** argv)
 {
     int zaehler_sleeps = 0;
-    uint16_t no_mb = 2000;
+    uint16_t no_mb = 1000;
     //char (*memory) [no_mb*SIZE] = malloc(sizeof(*memory));
     int8_t *memory = (int8_t*) malloc(SIZE*no_mb);
     
     if (memory) 
-        memset(memory, 1, sizeof(*memory));
+        memset(memory, 1, SIZE*no_mb*sizeof(*memory));
     else
         perror("malloc() failed");
 
@@ -63,6 +63,8 @@ int main(int argc, char** argv)
         sys_msleep(1000);
         
         zaehler_sleeps++;
+
+        printf("Value at start %d, mid %d and end %d of memory array \n", memory[0], memory[no_mb*SIZE/2], memory[(no_mb*SIZE)-1]);
 
         printf("Loop Number %d sizeof(*memory) %d\n", zaehler_sleeps, SIZE*no_mb*sizeof(*memory));
     }

@@ -47,7 +47,8 @@ int main(int argc, char** argv)
     //char (*memory) [no_mb*SIZE] = malloc(sizeof(*memory));
     int8_t *memory = (int8_t*) malloc(SIZE*no_mb);
     
-    if (memory) 
+   if (memory) 
+        //for(i=0; i < SIZE*no_mb; i++)
         memset(memory, 1, SIZE*no_mb*sizeof(int8_t));
     else
         perror("malloc() failed");
