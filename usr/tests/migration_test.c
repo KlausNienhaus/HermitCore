@@ -42,40 +42,31 @@
 
 int main(int argc, char** argv)
 {
-    //uint64_t memory_size = *argv[argc-1];
     int zaehler_sleeps = 0;
-    uint16_t no_mb = 250;
-    /*if(argc < 2) {
-		no_mb = *argv[1];
-        printf("argv[1] %d, *argv[1] %d", argv[1], *argv[1]);
-	}else{
-        printf("no arguments passed");
-    }*/
-
-    char (*memory) [no_mb*SIZE] = malloc(sizeof(*memory));
-    printf("charsize %d, int8_t size %d", sizeof(char), sizeof(int8_t));
+    uint16_t no_mb = 1000;
+    //char (*memory) [no_mb*SIZE] = malloc(sizeof(*memory));
+    int8_t *memory = (int8_t*) malloc(SIZE*no_mb);
     
     if (memory) 
-        memset(memory, 1, sizeof(*memory));
+        memset(memory, 1, SIZE*no_mb*sizeof(*memory));
     else
         perror("malloc() failed");
 
-    char* comm = getenv("PROXY_COMM");
-    printf("proxy comm %d \n", comm);
 
     malloc_stats();
 
 /*   @brief Run Infintie Loop to test Checkpointing by looking at:
  *  local time differences, process time difference and loop iteration count */
-    while (zaehler_sleeps<100)
+    while (zaehler_sleeps<3)
     {
-        //printf("argv[1] %d, *argv[1] %d, sizeof(memory) %d", argv[1], *argv[1], sizeof(memory));
         
         sys_msleep(1000);
         
         zaehler_sleeps++;
 
-        printf("Loop Number %d sizeof(*memory) %d\n", zaehler_sleeps, sizeof(*memory));
+        printf("Value at start %d, mid %d and end %d of memory array \n", memory[0], memory[no_mb*SIZE/2], memory[(no_mb*SIZE)-1]);
+
+        printf("Loop Number %d sizeof(*memory) %d\n", zaehler_sleeps, SIZE*no_mb*sizeof(*memory));
     }
     
     free(memory);
