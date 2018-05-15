@@ -11,9 +11,10 @@ else
     iterations="$3";
 fi
 
-
-
 mkdir coldmigration
+
+file_timings="coldmigration/coldmig_timings.log"
+echo "MemoryChunks TimeSpent(us) Config(us) vcpu(us) clock(us) memory(us) pagetablewalk(us) chunktransfer(us)"  > $file_timings
 
 file_empty="coldmigration/coldmig_uhyve_0,00.log"
 file_250="coldmigration/coldmig_uhyve_0,25.log"
@@ -104,46 +105,6 @@ until [ $counter -eq $iterations ]; do
     echo "migration $counter time $migtime"
     let counter+=1
     sleep 7
-    done
-
-counter=0;
-until [ $counter -eq $iterations ]; do
-    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1 HERMIT_MEM=2500M
-	
-   
-    bin/proxy x86_64-hermit/extra/tests/migration_test2 & sleep 2 
-    kill -10 $! & start="$(date +%s.%N)"
-    if [ $? -ne 0 ]; then
-       echo "migration proccess encountered an error";
-       exit 1;	
-    fi 
-    wait
-    stop="$(date +%s.%N)"
-    migtime=$(bc <<< "$stop - $start")
-    echo "$migtime"  >> $file_2
-    echo "migration $counter time $migtime"
-    let counter+=1
-    sleep 7
-    done
-
-counter=0;
-until [ $counter -eq $iterations ]; do
-    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1 HERMIT_MEM=4500M
-	
-   
-    bin/proxy x86_64-hermit/extra/tests/migration_test4 & sleep 2 
-    kill -10 $! & start="$(date +%s.%N)"
-    if [ $? -ne 0 ]; then
-       echo "migration proccess encountered an error";
-       exit 1;	
-    fi 
-    wait
-    stop="$(date +%s.%N)"
-    migtime=$(bc <<< "$stop - $start")
-    echo "$migtime"  >> $file_4
-    echo "migration $counter time $migtime"
-    let counter+=1
-    sleep 10
     done
 
 

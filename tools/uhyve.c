@@ -1450,7 +1450,9 @@ static void timer_handler(int signum)
 	struct timeval begin, end, config_vcpu, vcpu_clock, clock_memory, memory_end, chunk_begin, chunk_end;
 	FILE* f = NULL;
 	size_t memorypart=0; //start_config, config_time_spent;
+	size_t chunk_trans_spent=0;
 
+		
 	//printf("signum: %d\n", signum);
 
 	if (verbose)
@@ -1462,10 +1464,6 @@ static void timer_handler(int signum)
 	if (stat("checkpoint", &st) == -1)
 		mkdir("checkpoint", 0700);
 
-
-	
-	
-	
 
 	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
 	{
@@ -1615,13 +1613,13 @@ nextslot:
 				{
 					size_t addr = (i*sizeof(size_t)*8+j)*PAGE_SIZE;
 					if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
-						//gettimeofday(&chunk_start, NULL);
+						gettimeofday(&chunk_start, NULL);
 						comm_chunk_client(&addr, (size_t*) (guest_mem + addr), comm_new_host, "mem","PAGE_SIZE");
 						memorypart++;
-						/*gettimeofday(&chunk_end, NULL);
-						size_t usec = (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
-						usec += (chunk_end.tv_usec - chunk_begin.tv_usec);
-						printf("Send memory chunk %d in %zd us and waited \n", memorypart, usec);*/
+						gettimeofday(&chunk_end, NULL);
+						chunk_trans_spent += (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
+						chunk_trans_spent += (chunk_end.tv_usec - chunk_begin.tv_usec);
+						//printf("Send memory chunk %d in %zd us and waited \n", memorypart, usec);
 					if (hermit_check>0){
 						if (fwrite(&addr, sizeof(size_t), 1, f) != 1)
 							err(1, "fwrite failed");
@@ -1669,13 +1667,13 @@ nextslot:
 							size_t pgt_entry = pgt[l] & ~PG_PSE; // because PAT use the same bit as PSE
 								//printf("timer_hander sending mem_chunk page_bits chunk_client next\n");
 							if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
-								//gettimeofday(&chunk_begin, NULL);
+								gettimeofday(&chunk_begin, NULL);
 								comm_chunk_client(&pgt_entry, (size_t*)(guest_mem + (pgt[l] & PAGE_MASK)), comm_new_host, "mem","PAGE_BITS");
 								memorypart++;
-								/*gettimeofday(&chunk_end, NULL);
-								size_t usec = (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
-	    						usec += (chunk_end.tv_usec - chunk_begin.tv_usec);
-								printf("Send memory chunk %d in %zd us \n", memorypart, usec);*/
+								gettimeofday(&chunk_end, NULL);
+								chunk_trans_spent += (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
+								chunk_trans_spent += (chunk_end.tv_usec - chunk_begin.tv_usec);
+								//printf("Send memory chunk %d in %zd us \n", memorypart, usec);
 							if (hermit_check>0){
 								if (fwrite(&pgt_entry, sizeof(size_t), 1, f) != 1)
 									err(1, "fwrite failed");
@@ -1691,13 +1689,13 @@ nextslot:
 						pgd[k] = pgd[k] & ~(PG_DIRTY|PG_ACCESSED);
 						//printf("timer_hander sending mem_chunk page_2M chunk_client next\n");
 					if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
-						//gettimeofday(&chunk_begin, NULL);
+						gettimeofday(&chunk_begin, NULL);
 						comm_chunk_client(pgd+k, (size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), comm_new_host, "mem","PAGE_2M_BITS");
 						memorypart++;
-						/*gettimeofday(&chunk_end, NULL);
-						size_t usec = (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
-						usec += (chunk_end.tv_usec - chunk_begin.tv_usec);
-						printf("Send memory chunk %d in %zd us and waited \n", memorypart, usec);*/
+						gettimeofday(&chunk_end, NULL);
+						chunk_trans_spent += (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
+						chunk_trans_spent += (chunk_end.tv_usec - chunk_begin.tv_usec);
+						//printf("Send memory chunk %d in %zd us and waited \n", memorypart, usec);
 					if (hermit_check>0){
 						if (fwrite(pgd+k, sizeof(size_t), 1, f) != 1)
 							err(1, "fwrite failed");
@@ -1755,14 +1753,17 @@ nextslot:
 		size_t memory_time_spent = (memory_end.tv_sec - clock_memory.tv_sec) * 1000000;
 		memory_time_spent += (memory_end.tv_usec - clock_memory.tv_usec);
 
-		snprintf(fname, MAX_FNAME, "migration_timings.log", no_checkpoint);
+		size_t mig_page_spent = memory_time_spent - chunk_trans_spent;
+
+		snprintf(fname, MAX_FNAME, "coldmigration/coldmig_timings.log", no_checkpoint);
 		f = fopen(fname, "a");
 		if (f == NULL) {
 			err(1, "fopen: unable to open file");
 		}
-		fprintf(f, "TimeSpent Mig: %zd us, Config: %zd us, vcpu: %zd us, clock: %zd us, memory: %zd us\n", mig_time_spent, config_time_spent, vcpu_time_spent, clock_time_spent, memory_time_spent);
-		printf("TimeSpent Mig: %zd us, Config: %zd us, vcpu: %zd us, clock: %zd us, memory: %zd us\n", mig_time_spent, config_time_spent, vcpu_time_spent, clock_time_spent, memory_time_spent);
-		
+		//fprintf(f, "TimeSpent Mig: %zd us, Config: %zd us, vcpu: %zd us, clock: %zd us, memory: %zd us\n", mig_time_spent, config_time_spent, vcpu_time_spent, clock_time_spent, memory_time_spent);
+		fprintf(f, "%d %zd %zd %zd %zd %zd %zd %zd\n", memorypart, mig_time_spent, config_time_spent, vcpu_time_spent, clock_time_spent, memory_time_spent, mig_page_spent, chunk_trans_spent);
+		printf("MemoryParts %d TimeSpent Mig: %zd us, Config: %zd us, vcpu: %zd us, clock: %zd us, memory: %zd us, pagetablewalk: %zd us, chunktransfer: %zd us\n", memorypart, mig_time_spent, config_time_spent, vcpu_time_spent, clock_time_spent, memory_time_spent, mig_page_spent, chunk_trans_spent);
+		fclose(f);
 		//commclient("checkpoint/chk_config.txt","checkpoint",comm_new_host);
 		//commclient("checkpoint/chk0_core0.dat","checkpoint",comm_new_host);
 		//commclient("checkpoint/chk0_mem.dat","checkpoint",comm_new_host);
