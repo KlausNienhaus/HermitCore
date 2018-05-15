@@ -50,7 +50,7 @@ int main(int argc, char** argv)
    if (memory) 
         //for(int i=0; i < SIZE*no_mb; i++)
             //memory[i]=1;
-        memset(memory[i], 1, sizeof(int8_t));
+        memset(memory, 1, SIZE*no_mb*sizeof(int8_t));
     else
         perror("malloc() failed");
 
