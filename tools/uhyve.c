@@ -1615,10 +1615,10 @@ nextslot:
 					if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
 						gettimeofday(&chunk_start, NULL);
 						comm_chunk_client(&addr, (size_t*) (guest_mem + addr), comm_new_host, "mem","PAGE_SIZE");
-						memorypart++;
 						gettimeofday(&chunk_end, NULL);
 						chunk_trans_spent += (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
 						chunk_trans_spent += (chunk_end.tv_usec - chunk_begin.tv_usec);
+						memorypart++;
 						//printf("Send memory chunk %d in %zd us and waited \n", memorypart, usec);
 					if (hermit_check>0){
 						if (fwrite(&addr, sizeof(size_t), 1, f) != 1)
@@ -1669,10 +1669,10 @@ nextslot:
 							if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
 								gettimeofday(&chunk_begin, NULL);
 								comm_chunk_client(&pgt_entry, (size_t*)(guest_mem + (pgt[l] & PAGE_MASK)), comm_new_host, "mem","PAGE_BITS");
-								memorypart++;
 								gettimeofday(&chunk_end, NULL);
 								chunk_trans_spent += (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
 								chunk_trans_spent += (chunk_end.tv_usec - chunk_begin.tv_usec);
+								memorypart++;
 								//printf("Send memory chunk %d in %zd us \n", memorypart, usec);
 							if (hermit_check>0){
 								if (fwrite(&pgt_entry, sizeof(size_t), 1, f) != 1)
@@ -1691,10 +1691,10 @@ nextslot:
 					if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
 						gettimeofday(&chunk_begin, NULL);
 						comm_chunk_client(pgd+k, (size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), comm_new_host, "mem","PAGE_2M_BITS");
-						memorypart++;
 						gettimeofday(&chunk_end, NULL);
 						chunk_trans_spent += (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
 						chunk_trans_spent += (chunk_end.tv_usec - chunk_begin.tv_usec);
+						memorypart++;
 						//printf("Send memory chunk %d in %zd us and waited \n", memorypart, usec);
 					if (hermit_check>0){
 						if (fwrite(pgd+k, sizeof(size_t), 1, f) != 1)
@@ -1735,11 +1735,10 @@ nextslot:
 		comm_server_accept();			
 		comm_chunk_server(NULL);
 		comm_server_close();
-		//mig_end = clock();
+		
 		gettimeofday(&end, NULL);
 		size_t mig_time_spent = (end.tv_sec - begin.tv_sec) * 1000000;
 		mig_time_spent += (end.tv_usec - begin.tv_usec);
-		//fprintf(stderr, "Create checkpoint %u in %zd ms\n", no_checkpoint, msec);
 		
 		size_t config_time_spent = (config_vcpu.tv_sec - begin.tv_sec) * 1000000;
 		config_time_spent += (config_vcpu.tv_usec - begin.tv_usec);

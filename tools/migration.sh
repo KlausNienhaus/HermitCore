@@ -44,7 +44,7 @@ until [ $counter -eq $iterations ]; do
     echo "$migtime"  >> $file_empty
     echo "migration $counter time $migtime"
     let counter+=1
-    sleep 5
+    sleep 3
     done
 
 counter=0;
@@ -64,7 +64,7 @@ until [ $counter -eq $iterations ]; do
     echo "$migtime"  >> $file_250
     echo "migration $counter time $migtime"
     let counter+=1
-    sleep 5
+    sleep 3
     done
 
 counter=0;
@@ -84,7 +84,7 @@ until [ $counter -eq $iterations ]; do
     echo "$migtime"  >> $file_500
     echo "migration $counter time $migtime"
     let counter+=1
-    sleep 5
+    sleep 3
     done
 
 counter=0;
@@ -104,7 +104,7 @@ until [ $counter -eq $iterations ]; do
     echo "$migtime"  >> $file_1
     echo "migration $counter time $migtime"
     let counter+=1
-    sleep 7
+    sleep 3
     done
 
 
