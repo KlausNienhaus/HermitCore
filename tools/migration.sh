@@ -1,17 +1,21 @@
-if [ "$#" -ne 3 ]; then
-    if [ "$#" -eq 2 ]; then
-        iterations=1;
+if [ "$#" -ne 4 ]; then
+    check_dir="checkpoint"
+    if [ "$#" -ne 3 ]; then
+        if [ "$#" -eq 2 ]; then
+            iterations=1;
+        else
+            echo "Illegal number of parameters"
+            echo "    usage:"
+            echo "    ./migration.sh <client/origin-ip> <server/destination-ip> <iterations> <checkpoint-dir>"
+            exit 1;
+        fi
     else
-        echo "Illegal number of parameters"
-        echo "    usage:"
-        echo "    ./migration.sh <client/origin-ip> <server/destination-ip> <iterations>"
-        exit 1;
+        iterations="$3";
     fi
 else
     iterations="$3";
+    check_dir="$4"
 fi
-
-
 
 mkdir offlinemigration
 
@@ -31,8 +35,8 @@ file_16="offlinemigration/offlinemig_uhyve_16.log"
 #waittonext = 6
 counter=0;
 until [ $counter -eq $iterations ]; do
-    rm -rf checkpoint
-    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1 HERMIT_MEM=30M
+    rm -rf $check_dir
+    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1 HERMIT_MEM=30M HERMIT_CHECKDIR=$check_dir
 	
     bin/proxy x86_64-hermit/extra/tests/migration_test0 & sleep 2 
     kill -10 $! & start="$(date +%s.%N)"
@@ -51,8 +55,8 @@ until [ $counter -eq $iterations ]; do
 
 counter=0;
 until [ $counter -eq $iterations ]; do
-    rm -rf checkpoint
-    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1 HERMIT_MEM=300M
+    rm -rf $check_dir
+    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1 HERMIT_MEM=300M HERMIT_CHECKDIR=$check_dir
 	
     bin/proxy x86_64-hermit/extra/tests/migration_test250 & sleep 2 
     kill -10 $! & start="$(date +%s.%N)"	
@@ -71,8 +75,8 @@ until [ $counter -eq $iterations ]; do
 
 counter=0;
 until [ $counter -eq $iterations ]; do
-    rm -rf checkpoint
-    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1 HERMIT_MEM=600M
+    rm -rf $check_dir
+    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1 HERMIT_MEM=600M HERMIT_CHECKDIR=$check_dir
 	
     bin/proxy x86_64-hermit/extra/tests/migration_test500 & sleep 2 
     kill -10 $! & start="$(date +%s.%N)"
@@ -91,8 +95,8 @@ until [ $counter -eq $iterations ]; do
 
 counter=0;
 until [ $counter -eq $iterations ]; do
-    rm -rf checkpoint
-    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1 HERMIT_MEM=1100M
+    rm -rf $check_dir
+    export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1 HERMIT_MEM=1100M HERMIT_CHECKDIR=$check_dir
    
     bin/proxy x86_64-hermit/extra/tests/migration_test1 & sleep 2 
     kill -10 $! & start="$(date +%s.%N)"

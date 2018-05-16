@@ -51,7 +51,7 @@
 
 //@brief:   Server side C function for TCP Socket Connections 
 //          atm recieves data file from client (e.g. checkpoint)
-int commserver(void)
+int commserver(char* position)
 {
     int server_fd, new_conn_fd; //data_size;
     struct sockaddr_in address;
@@ -112,7 +112,7 @@ int commserver(void)
         }
         //printf("metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
 
-        
+        strncpy(position, meta_data.data_position, 256);
         if (stat(meta_data.data_position, &st) == -1)
 		    mkdir(meta_data.data_position, 0700);
         
@@ -129,7 +129,7 @@ int commserver(void)
             return 1;
         }
 
-	int total = 0;
+	    int total = 0;
 	
         // recieve data and write to file
         while(total < meta_data.data_size)

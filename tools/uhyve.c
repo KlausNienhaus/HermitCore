@@ -192,6 +192,7 @@ const char* hermit_check = NULL; //getenv("HERMIT_CHECKPOINT");
 const char* comm_mode = NULL; //getenv("PROXY_COMM");
 static char *comm_new_host = "xxx.xxx.xxx.xxx";
 static char *comm_old_host = "xxx.xxx.xxx.xxx";
+static char *check_dir = NULL;
 
 static __thread struct kvm_run *run = NULL;
 static __thread int vcpufd = -1;
@@ -454,7 +455,7 @@ static int load_checkpoint(uint8_t* mem, char* path)
 	i = full_checkpoint ? no_checkpoint : 0;
 	for(; i<=no_checkpoint; i++)
 	{
-		snprintf(fname, MAX_FNAME, "checkpoint/chk%u_mem.dat", i);
+		snprintf(fname, MAX_FNAME, "%s/chk%u_mem.dat",check_dir, i);
 
 		FILE* f = fopen(fname, "r");
 		if (f == NULL)
@@ -767,7 +768,7 @@ static int vcpu_loop(void)
 	if (restart) {
 		pthread_barrier_wait(&barrier);
 		if (strcmp(comm_mode,"server")==0){
-		commclient("finished", "checkpoint", comm_old_host);
+		commclient("finished", check_dir, comm_old_host);
 		comm_mode="client";
 		setenv("PROXY_COMM","client",1);
 		const char* test = getenv("PROXY_COMM");
@@ -977,7 +978,8 @@ static int vcpu_init(void)
 		struct kvm_xcrs xcrs;
 		struct kvm_vcpu_events events;
 
-		snprintf(fname, MAX_FNAME, "checkpoint/chk%u_core%u.dat", no_checkpoint, cpuid);
+		
+		snprintf(fname, MAX_FNAME, "%s/chk%u_core%u.dat",check_dir, no_checkpoint, cpuid);
 
 		FILE* f = fopen(fname, "r");
 		if (f == NULL)
@@ -1089,7 +1091,7 @@ static void save_cpu_state(void)
 	kvm_ioctl(vcpufd, KVM_GET_VCPU_EVENTS, &events);
 	kvm_ioctl(vcpufd, KVM_GET_MP_STATE, &mp_state);
 
-	snprintf(fname, MAX_FNAME, "checkpoint/chk%u_core%u.dat", no_checkpoint, cpuid);
+	snprintf(fname, MAX_FNAME, "%s/chk%u_core%u.dat",check_dir, no_checkpoint, cpuid);
 
 	FILE* f = fopen(fname, "w");
 	if (f == NULL) {
@@ -1159,11 +1161,14 @@ void sigterm_handler(int signum)
 
 int uhyve_init(char *path)
 {
+	check_dir = malloc(sizeof(char) * (MAX_FNAME));
+	char fname[MAX_FNAME];
 	hermit_check = getenv("HERMIT_CHECKPOINT");
 	comm_mode = getenv("PROXY_COMM");
 	if (strncmp(comm_mode, "server", 6) == 0) {
 		printf("\nStarting in Server Mode \n");
-		commserver();
+		commserver(check_dir);
+		printf("check_dir from server %s\n", check_dir);
 	}
 
 	comm_new_host = getenv("COMM_DEST");
@@ -1183,7 +1188,8 @@ int uhyve_init(char *path)
 	// register routine to close the VM
 	atexit(uhyve_atexit);
 
-	FILE* f = fopen("checkpoint/chk_config.txt", "r");
+	snprintf(fname, MAX_FNAME, "%s/chk_config.txt", check_dir);
+	FILE* f = fopen(fname, "r");
 	if (f != NULL) {
 		int tmp = 0;
 		restart = true;
@@ -1379,6 +1385,13 @@ static void timer_handler(int signum)
 	size_t chunk_trans_spent=0;
 	//hermit_check = getenv("HERMIT_CHECKPOINT");
 	//comm_mode = getenv("PROXY_COMM");
+	//check_dir
+	check_dir = malloc(sizeof(char) * (MAX_FNAME));
+	check_dir = getenv("HERMIT_CHECKDIR");
+	if(!check_dir)
+		check_dir = "checkpoint";
+	
+	printf("check_dir at timer_handler start: %s\n", check_dir);
 
 	if (verbose)
 		gettimeofday(&begin, NULL);
@@ -1386,13 +1399,14 @@ static void timer_handler(int signum)
 	gettimeofday(&begin, NULL);
 	//printf("before checkpoint folder\n");
 
-	if (stat("checkpoint", &st) == -1)
-		mkdir("checkpoint", 0700);
+	if (stat(check_dir, &st) == -1)
+		mkdir(check_dir, 0700);
 	
 	//printf("before chk_config\n");
 
 	// update configuration file
-	f = fopen("checkpoint/chk_config.txt", "w");
+	snprintf(fname, MAX_FNAME, "%s/chk_config.txt",check_dir);
+	f = fopen(fname, "w");
 	if (f == NULL) {
 		err(1, "fopen: unable to open file");
 	}
@@ -1422,7 +1436,7 @@ static void timer_handler(int signum)
 
 	gettimeofday(&vcpu_clock, NULL);
 
-	snprintf(fname, MAX_FNAME, "checkpoint/chk%u_mem.dat", no_checkpoint);
+	snprintf(fname, MAX_FNAME, "%s/chk%u_mem.dat",check_dir, no_checkpoint);
 
 	f = fopen(fname, "w");
 	if (f == NULL) {
@@ -1582,26 +1596,31 @@ nextslot:
 		//printf("before commclient calls\n");
 		
 		gettimeofday(&file_begin, NULL);
-		commclient("checkpoint/chk_config.txt", "checkpoint", comm_new_host);
+		
+		snprintf(fname, MAX_FNAME, "%s/chk_config.txt", check_dir);
+		commclient(fname, check_dir, comm_new_host);
 		for (int j=0; j<no_checkpoint;j++){
 			for(int i=0; i<ncores; i++){
-				char core_files[256];
-				sprintf(core_files, "checkpoint/chk%d_core%d.dat", (no_checkpoint-1), (ncores-1));
-				//printf(core_files);
-				commclient(core_files, "checkpoint", comm_new_host);
+				//char core_files[256];
+				sprintf(fname, "%s/chk%d_core%d.dat", check_dir, (no_checkpoint-1), (ncores-1));
+				//sprintf(core_files, "checkpoint/chk%d_core%d.dat", (no_checkpoint-1), (ncores-1));
+				commclient(fname, check_dir, comm_new_host);
 			}
 		}
 		for (int j=0; j<no_checkpoint;j++){
-				char mem_files[256];
-				sprintf(mem_files, "checkpoint/chk%d_mem.dat", (no_checkpoint-1));
-				//printf(mem_files);
-				commclient(mem_files, "checkpoint", comm_new_host);
+				//char mem_files[256];
+				sprintf(fname, "%s/chk%d_mem.dat", check_dir, (no_checkpoint-1));
+				//sprintf(mem_files, "checkpoint/chk%d_mem.dat", (no_checkpoint-1));
+				commclient(fname, check_dir, comm_new_host);
 			}
 		//printf("before sending finished\n");
-		commclient("finished", "checkpoint", comm_new_host);
+		commclient("finished", check_dir, comm_new_host);
 		gettimeofday(&file_end, NULL);
-		//printf("before recieving migration confirm received\n");
-		commserver();
+		printf("before recieving migration confirm received\n");
+		
+		check_dir = malloc(sizeof(char) * (MAX_FNAME));
+		commserver(check_dir);
+		printf("check_dir from client: %s\n", check_dir);
 
 		gettimeofday(&end, NULL);
 		size_t mig_time_spent = (end.tv_sec - begin.tv_sec) * 1000000;

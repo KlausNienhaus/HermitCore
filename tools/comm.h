@@ -39,7 +39,7 @@ typedef struct{
     char    data_position[1024]; /* Data/File Path */
 } comm_socket_header_t;
 
-int commserver(void);
+int commserver(char *position);
 int commclient(char *path, char *position, char *server_ip);
 
 #endif
