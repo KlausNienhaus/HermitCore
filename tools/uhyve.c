@@ -1373,7 +1373,7 @@ static void timer_handler(int signum)
 	struct stat st = {0};
 	const size_t flag = (!full_checkpoint && (no_checkpoint > 0)) ? PG_DIRTY : PG_ACCESSED;
 	char fname[MAX_FNAME];
-	struct timeval begin, end, config_vcpu, vcpu_clock, clock_memory, memory_end, chunk_begin, chunk_end, file_begin, file_end;
+	struct timeval begin, end, config_vcpu, vcpu_clock, clock_memory, memory_end, chunk_begin, chunk_end, file_begin, file_end, file_closing;
 	FILE* f = NULL;
 	size_t memorypart=0; //start_config, config_time_spent;
 	size_t chunk_trans_spent=0;
@@ -1558,11 +1558,12 @@ nextslot:
 	}
 #endif
 
+	//messung für schreiben einführen wegen nfs system einführen
+	gettimeofday(&memory_end, NULL);
+
 	fclose(f);
 
-	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10){
-		gettimeofday(&memory_end, NULL);
-	}
+	gettimeofday(&file_closing, NULL);
 
 	//printf("after mem file dat file\n");
 
@@ -1620,6 +1621,9 @@ nextslot:
 
 		size_t mig_page_spent = memory_time_spent - chunk_trans_spent;
 
+		size_t file_close_spent = (file_closing.tv_sec - memory_end.tv_sec) * 1000000;
+		file_close_spent += (file_closing.tv_usec - memory_end.tv_usec);
+
 		size_t file_time_spent = (file_end.tv_sec - file_begin.tv_sec) * 1000000;
 		file_time_spent += (file_end.tv_usec - file_begin.tv_usec);
 
@@ -1629,8 +1633,8 @@ nextslot:
 			err(1, "fopen: unable to open file");
 		}
 		//fprintf(f, "TimeSpent Mig: %zd us, Config: %zd us, vcpu: %zd us, clock: %zd us, memory: %zd us\n", mig_time_spent, config_time_spent, vcpu_time_spent, clock_time_spent, memory_time_spent);
-		fprintf(f, "%d %zd %zd %zd %zd %zd %zd %zd %zd \n", memorypart, mig_time_spent, config_time_spent, vcpu_time_spent, clock_time_spent, memory_time_spent, mig_page_spent, chunk_trans_spent, file_time_spent);
-		printf("MemoryParts %d TimeSpent Mig: %zd us, Config: %zd us, vcpu: %zd us, clock: %zd us, memory: %zd us, pagetablewalk: %zd us, chunktofile: %zd us, filetransfer: %zd us\n", memorypart, mig_time_spent, config_time_spent, vcpu_time_spent, clock_time_spent, memory_time_spent, mig_page_spent, chunk_trans_spent, file_time_spent);
+		fprintf(f, "%d %zd %zd %zd %zd %zd %zd %zd %zd %zd\n", memorypart, mig_time_spent, config_time_spent, vcpu_time_spent, clock_time_spent, memory_time_spent, mig_page_spent, chunk_trans_spent, file_close_spent, file_time_spent);
+		printf("MemoryParts %d TimeSpent Mig: %zd us, Config: %zd us, vcpu: %zd us, clock: %zd us, memory: %zd us, pagetablewalk: %zd us, chunktofile: %zd us, file_close_spent %zd us, filetransfer: %zd us\n", memorypart, mig_time_spent, config_time_spent, vcpu_time_spent, clock_time_spent, memory_time_spent, mig_page_spent, chunk_trans_spent, file_close_spent, file_time_spent);
 		fclose(f);
 	
 		printf("Client transfered checkpoint and stops execution now\n");
