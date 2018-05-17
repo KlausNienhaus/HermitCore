@@ -1467,8 +1467,6 @@ static void timer_handler(int signum)
 
 	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
 	{
-		
-	
 		comm_config_t checkpoint_config;
 		checkpoint_config.ncores=ncores;
 		checkpoint_config.guest_size=guest_size;
@@ -1754,14 +1752,19 @@ nextslot:
 
 		size_t mig_page_spent = memory_time_spent - chunk_trans_spent;
 
+		size_t restore_time_spent = (end.tv_sec - memory_end.tv_sec) * 1000000;
+		restore_time_spent += (end.tv_usec - memory_end.tv_usec);
+
+		if (stat("coldmigration", &st) == -1)
+			mkdir("coldmigration", 0700);
 		snprintf(fname, MAX_FNAME, "coldmigration/coldmig_timings.log", no_checkpoint);
 		f = fopen(fname, "a");
 		if (f == NULL) {
 			err(1, "fopen: unable to open file");
 		}
 		//fprintf(f, "TimeSpent Mig: %zd us, Config: %zd us, vcpu: %zd us, clock: %zd us, memory: %zd us\n", mig_time_spent, config_time_spent, vcpu_time_spent, clock_time_spent, memory_time_spent);
-		fprintf(f, "%d %zd %zd %zd %zd %zd %zd %zd\n", memorypart, mig_time_spent, config_time_spent, vcpu_time_spent, clock_time_spent, memory_time_spent, mig_page_spent, chunk_trans_spent);
-		printf("MemoryParts %d TimeSpent Mig: %zd us, Config: %zd us, vcpu: %zd us, clock: %zd us, memory: %zd us, pagetablewalk: %zd us, chunktransfer: %zd us\n", memorypart, mig_time_spent, config_time_spent, vcpu_time_spent, clock_time_spent, memory_time_spent, mig_page_spent, chunk_trans_spent);
+		fprintf(f, "%d %zd %zd %zd %zd %zd %zd %zd %zd\n", memorypart, mig_time_spent, config_time_spent, vcpu_time_spent, clock_time_spent, memory_time_spent, mig_page_spent, chunk_trans_spent, restore_time_spent);
+		printf("MemoryParts %d TimeSpent Mig: %zd us, Config: %zd us, vcpu: %zd us, clock: %zd us, memory: %zd us, pagetablewalk: %zd us, chunktransfer: %zd us, restoretime: %zd us\n", memorypart, mig_time_spent, config_time_spent, vcpu_time_spent, clock_time_spent, memory_time_spent, mig_page_spent, chunk_trans_spent, restore_time_spent);
 		fclose(f);
 		//commclient("checkpoint/chk_config.txt","checkpoint",comm_new_host);
 		//commclient("checkpoint/chk0_core0.dat","checkpoint",comm_new_host);

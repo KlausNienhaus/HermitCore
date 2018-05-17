@@ -16,14 +16,14 @@ mkdir coldmigration
 file_timings="coldmigration/coldmig_timings.log"
 echo "MemoryChunks TimeSpent(us) Config(us) vcpu(us) clock(us) memory(us) pagetablewalk(us) chunktransfer(us) restoretime(us)"  > $file_timings
 
-file_empty="coldmigration/coldmig_uhyve_0,00.log"
-file_250="coldmigration/coldmig_uhyve_0,25.log"
-file_500="coldmigration/coldmig_uhyve_0,50.log" 
-file_1="coldmigration/coldmig_uhyve_1.log"
-file_2="coldmigration/coldmig_uhyve_2.log"  
-file_4="coldmigration/coldmig_uhyve_4.log"
-file_8="coldmigration/coldmig_uhyve_8.log"
-file_16="coldmigration/coldmig_uhyve_16.log"  
+file_empty="coldmigration/coldmig_uhyve_empty_0,03.log"
+file_250="coldmigration/coldmig_uhyve_empty_0,30.log"
+file_500="coldmigration/coldmig_uhyve_empty_0,60.log" 
+file_1="coldmigration/coldmig_uhyve_empty_1,10.log"
+file_2="coldmigration/coldmigE_uhyve_2.log"  
+file_4="coldmigration/coldmigE_uhyve_4.log"
+file_8="coldmigration/coldmigE_uhyve_8.log"
+file_16="coldmigration/coldmigE_uhyve_16.log"  
 
 #echo "cold migration" >> $file_empty
 #waittonext = 6
@@ -52,7 +52,7 @@ until [ $counter -eq $iterations ]; do
     export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1 HERMIT_MEM=280M
 	
    
-    bin/proxy x86_64-hermit/extra/tests/migration_test250 & sleep 2 
+    bin/proxy x86_64-hermit/extra/tests/migration_test0 & sleep 2 
     kill -10 $! & start="$(date +%s.%N)"	
     if [ $? -ne 0 ]; then
        echo "migration proccess encountered an error";
@@ -72,7 +72,7 @@ until [ $counter -eq $iterations ]; do
     export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1 HERMIT_MEM=530M
 	
  
-    bin/proxy x86_64-hermit/extra/tests/migration_test500 & sleep 2 
+    bin/proxy x86_64-hermit/extra/tests/migration_test0 & sleep 2 
     kill -10 $! & start="$(date +%s.%N)"
     if [ $? -ne 0 ]; then
        echo "migration proccess encountered an error";
@@ -92,7 +92,7 @@ until [ $counter -eq $iterations ]; do
     export HERMIT_ISLE=uhyve PROXY_COMM=client COMM_DEST=$2 COMM_ORIGIN=$1 HERMIT_MEM=1050M
 	
    
-    bin/proxy x86_64-hermit/extra/tests/migration_test1 & sleep 2 
+    bin/proxy x86_64-hermit/extra/tests/migration_test0 & sleep 2 
     kill -10 $! & start="$(date +%s.%N)"
     if [ $? -ne 0 ]; then
        echo "migration proccess encountered an error";
