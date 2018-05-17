@@ -20,7 +20,7 @@ fi
 mkdir offlinemigration
 
 file_timings="offlinemigration/offlinemig_timings.log"
-echo "MemoryChunks TimeSpent(us) Config(us) vcpu(us) clock(us) memory(us) pagetablewalk(us) chunktofile(us) filetransfer(us)"  > $file_timings
+echo "MemoryChunks TimeSpent(us) Config(us) vcpu(us) clock(us) memory(us) pagetablewalk(us) chunktofile(us) file_close_spent(us) filetransfer(us) otherfilestransfer(us) memfiletransfer(us) restoretime(us)"  > $file_timings
 
 file_empty="offlinemigration/offlinemig_uhyve_0,00.log"
 file_250="offlinemigration/offlinemig_uhyve_0,25.log"
