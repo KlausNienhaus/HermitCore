@@ -724,12 +724,12 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char 
     //data_name and data_position in this case codes the type of transfer comming for comm_server
     strcpy(meta_data.data_name, comm_type);
     strcpy(meta_data.data_position, comm_subtype);
-    if (meta_data.data_position=="PAGE_BITS")
-        meta_data.data_size = (sizeof(size_t)+sizeof(unsigned long)+(1UL << PAGE_BITS));
+    /*if (meta_data.data_position=="PAGE_BITS")
+        meta_data.data_size = (sizeof(size_t)+(1UL << PAGE_BITS));
     else if (meta_data.data_position=="PAGE_2M_BITS")
-        meta_data.data_size = (sizeof(size_t)+sizeof(unsigned long)+(1UL << PAGE_2M_BITS));
+        meta_data.data_size = (sizeof(size_t)+(1UL << PAGE_2M_BITS));
     else if (meta_data.data_position=="PAGE_SIZE")
-        meta_data.data_size = (sizeof(size_t)+sizeof(unsigned long)+PAGE_SIZE);
+        meta_data.data_size = (sizeof(size_t)+PAGE_SIZE);*/
     
     //sending metadata for data type and control information
     int nsent=0;
