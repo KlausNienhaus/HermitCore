@@ -36,6 +36,7 @@
 #define retytime 1000
 size_t memory_chunk=0;
 int client_fd = 0, server_fd = 0, new_conn_fd = 0;
+comm_socket_header_t meta_data = {0};
 //static uint8_t *guest_mem = NULL;
 //size_t* pgt;
 
@@ -402,7 +403,7 @@ int comm_config_server(comm_config_t *checkpoint_config)
 
 //@brief:   Client side C function for TCP Socket Connections sending mem chunk of checkpoint
 //          atm sends Config to server (e.g. checkpoint)
-int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *comm_type, char *comm_subtype)
+int comm_config_client(comm_config_t *checkpoint_config) //, char *server_ip, char *comm_type, char *comm_subtype)
 {
     //comm_socket_header_t meta_data;
     //struct timeval begin, end; // config_begin, config_end;
@@ -442,7 +443,7 @@ int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *
 }
 
 
-int comm_register_server(comm_register_t *vcpu_register, uint32_t *cpuid, uint32_t *ncores)
+int comm_register_server(comm_register_t *vcpu_register, uint32_t *ncores)
 {
     //comm_socket_header_t meta_data = {0};
     
@@ -481,7 +482,7 @@ int comm_register_server(comm_register_t *vcpu_register, uint32_t *cpuid, uint32
 
 //@brief:   Comm function for sending VCPU register for checkpoint transfer
 //          atm sends data file to server (e.g. checkpoint)
-int comm_register_client(comm_register_t *vcpu_register,uint32_t *cpuid , uint32_t *ncores, char *server_ip, char *comm_type, char *comm_subtype)
+int comm_register_client(comm_register_t *vcpu_register, uint32_t *ncores) //, char *server_ip, char *comm_type, char *comm_subtype)
 {
     //comm_socket_header_t meta_data;
     //struct timeval begin, end; // config_begin, config_end;
@@ -568,7 +569,7 @@ int comm_clock_server(struct kvm_clock_data *clock)
 
 //@brief:   Client side C function for TCP Socket Connections sending Clock
 //          atm sends clock to server (e.g. checkpoint)
-int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_type, char *comm_subtype)
+int comm_clock_client(struct kvm_clock_data *clock) // char *server_ip, char *comm_type, char *comm_subtype)
 {
     //comm_socket_header_t meta_data;
     //struct timeval begin, end; // config_begin, config_end;
@@ -617,9 +618,9 @@ int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_
 int comm_chunk_server(uint8_t* mem)
 {
     size_t location;
-    size_t memorypart=0;
+    //size_t memorypart=0;
     //unsigned long masksize;
-    comm_socket_header_t meta_data = {0};
+    //meta_data = {0};
     //struct timeval begin, end, chunk_begin, chunk_end; //wait_start; // wait_end;
     //gettimeofday(&begin, NULL);
 
@@ -713,10 +714,10 @@ int comm_chunk_server(uint8_t* mem)
 
 //@brief:   Client side C function for TCP Socket Connections sending Memory Chunk
 //          atm sends pgd or pgt with corresponding memory to server (e.g. checkpoint)
-int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char *comm_type, char *comm_subtype)
+int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *comm_type, char *comm_subtype)
 {
     //unsigned long masksize;
-    comm_socket_header_t meta_data = {0};
+    //comm_socket_header_t meta_data = {0};
     //struct timeval begin, end, chunk_begin, chunk_end, connect_start; // wait_end
 
     

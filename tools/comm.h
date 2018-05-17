@@ -120,16 +120,16 @@ int comm_client_connect(char *server_ip);
 int comm_client_disconnect();
 
 int comm_config_server(comm_config_t *checkpoint_config);
-int comm_config_client(comm_config_t *checkpoint_config, char *server_ip, char *comm_type, char *comm_subtype);
+int comm_config_client(comm_config_t *checkpoint_config); //, char *server_ip, char *comm_type, char *comm_subtype);
 
-int comm_register_server(comm_register_t *vcpu_register, uint32_t *cpuid, uint32_t *ncores);
-int comm_register_client(comm_register_t *vcpu_register, uint32_t *cpuid, uint32_t *ncores, char *server_ip, char *comm_type, char *comm_subtype);
+int comm_register_server(comm_register_t *vcpu_register, uint32_t *ncores);
+int comm_register_client(comm_register_t *vcpu_register, uint32_t *ncores); //, char *server_ip, char *comm_type, char *comm_subtype);
 
 int comm_clock_server(struct kvm_clock_data *clock);
-int comm_clock_client(struct kvm_clock_data *clock, char *server_ip, char *comm_type, char *comm_subtype);
+int comm_clock_client(struct kvm_clock_data *clock); //, char *server_ip, char *comm_type, char *comm_subtype);
 
 int comm_chunk_server(uint8_t *mem);
-int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *server_ip, char *comm_type, char *comm_subtype);
+int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *comm_type, char *comm_subtype);
 
 
 #endif

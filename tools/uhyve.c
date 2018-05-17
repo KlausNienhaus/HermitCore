@@ -791,7 +791,7 @@ static int vcpu_loop(void)
 
 	if (restart) {
 		comm_client_connect(comm_old_host);
-		comm_chunk_client(NULL, NULL, comm_old_host, "mem","finished");
+		comm_chunk_client(NULL, NULL, "mem","finished");
 		comm_client_disconnect();
 		if (cpuid == 0)
 			no_checkpoint++;
@@ -1245,7 +1245,7 @@ int uhyve_init(char *path)
 			//comm_vcpu_register = vcpu_register;
 			comm_vcpu_register = (comm_register_t*) calloc(ncores,sizeof(comm_register_t));
 		}
-		comm_register_server(comm_vcpu_register, &cpuid, &ncores);
+		comm_register_server(comm_vcpu_register, &ncores);
 		//comm_server_close();
 	} else if ((strncmp(comm_mode, "server", 6)==0) && (hermit_check)){
 		if (f != NULL) {
@@ -1475,7 +1475,7 @@ static void timer_handler(int signum)
 		checkpoint_config.full_checkpoint=full_checkpoint;
 
 		comm_client_connect(comm_new_host);
-		comm_config_client(&checkpoint_config, comm_new_host, "config", "NULL");
+		comm_config_client(&checkpoint_config); //, comm_new_host, "config", "NULL");
 		gettimeofday(&config_vcpu, NULL);
 		
 	
@@ -1528,7 +1528,7 @@ static void timer_handler(int signum)
 		//for(int i=0;i<ncores;i++)
 			//printf("In timer_handler sending vcpu_register[cpuid].regs %d, vcpu_register[cpuid].lapic %d, (comm_vcpu_register+i)->regs , (comm_vcpu_register+i)->lapic\n", comm_vcpu_register[i].regs, comm_vcpu_register[i].lapic, (comm_vcpu_register+i)->regs, (comm_vcpu_register+i)->lapic);
 		
-		comm_register_client(comm_vcpu_register, &cpuid, &ncores, comm_new_host, "register", "NULL");
+		comm_register_client(comm_vcpu_register, &ncores); //, comm_new_host, "register", "NULL");
 		//comm_client_disconnect();
 		//usleep(2000);
 
@@ -1560,7 +1560,7 @@ static void timer_handler(int signum)
 	//printf("timer_hander sending clock over clock_client next\n");
 	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10){
 		//comm_client_connect(comm_new_host);
-		comm_clock_client(&kvm_clock, comm_new_host, "clock", "NULL");
+		comm_clock_client(&kvm_clock); //, comm_new_host, "clock", "NULL");
 		}
 	if (hermit_check>0){
 		if (fwrite(&kvm_clock, sizeof(kvm_clock), 1, f) != 1)
@@ -1612,7 +1612,7 @@ nextslot:
 					size_t addr = (i*sizeof(size_t)*8+j)*PAGE_SIZE;
 					if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
 						gettimeofday(&chunk_start, NULL);
-						comm_chunk_client(&addr, (size_t*) (guest_mem + addr), comm_new_host, "mem","PAGE_SIZE");
+						comm_chunk_client(&addr, (size_t*) (guest_mem + addr), "mem", "PAGE_SIZE");
 						gettimeofday(&chunk_end, NULL);
 						chunk_trans_spent += (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
 						chunk_trans_spent += (chunk_end.tv_usec - chunk_begin.tv_usec);
@@ -1666,7 +1666,7 @@ nextslot:
 								//printf("timer_hander sending mem_chunk page_bits chunk_client next\n");
 							if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
 								gettimeofday(&chunk_begin, NULL);
-								comm_chunk_client(&pgt_entry, (size_t*)(guest_mem + (pgt[l] & PAGE_MASK)), comm_new_host, "mem","PAGE_BITS");
+								comm_chunk_client(&pgt_entry, (size_t*)(guest_mem + (pgt[l] & PAGE_MASK)), "mem", "PAGE_BITS");
 								gettimeofday(&chunk_end, NULL);
 								chunk_trans_spent += (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
 								chunk_trans_spent += (chunk_end.tv_usec - chunk_begin.tv_usec);
@@ -1688,7 +1688,7 @@ nextslot:
 						//printf("timer_hander sending mem_chunk page_2M chunk_client next\n");
 					if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
 						gettimeofday(&chunk_begin, NULL);
-						comm_chunk_client(pgd+k, (size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), comm_new_host, "mem","PAGE_2M_BITS");
+						comm_chunk_client(pgd+k, (size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), "mem", "PAGE_2M_BITS");
 						gettimeofday(&chunk_end, NULL);
 						chunk_trans_spent += (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
 						chunk_trans_spent += (chunk_end.tv_usec - chunk_begin.tv_usec);
@@ -1706,7 +1706,7 @@ nextslot:
 	}
 	//printf("timer_hander sending mem_chunk finished chunk_client next\n");
 	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
-		comm_chunk_client(NULL, NULL, comm_new_host, "mem","finished");
+		comm_chunk_client(NULL, NULL, "mem", "finished");
 #endif
 	if 	(hermit_check>0)
 		fclose(f);
