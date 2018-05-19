@@ -640,7 +640,7 @@ int comm_chunk_server(uint8_t* mem)
         //printf("In chunk_server metafilesize: %d to filename: %s and position: %s \n" , meta_data.data_size, meta_data.data_name, meta_data.data_position);
 
         //printf("Sending \n");
-        if ((strcmp(meta_data.data_name,"mem")==0) && (strcmp(meta_data.data_position,"finished")!=0)){
+        if ((strcmp(meta_data.data_name,"m")==0) && (strcmp(meta_data.data_position,"f")!=0)){
             size_t chunk_size = 0;         
             int nrecv=0;
             int total=0;
@@ -649,19 +649,19 @@ int comm_chunk_server(uint8_t* mem)
             //printf("location nrecv %d sizeof(size_t) %d\n", nrecv, sizeof(size_t));
             nrecv=0;
             //printf("Data_position: %s",meta_data.data_position);
-            if (strcmp(meta_data.data_position,"PAGE_BITS")==0){
+            if (strcmp(meta_data.data_position,"B")==0){
                 while(nrecv<(1UL << PAGE_BITS))
                     total += nrecv += recv(new_conn_fd, (void*)(size_t*)(mem + (location & PAGE_MASK))+nrecv, (1UL << PAGE_BITS)-nrecv, 0);
                 //printf("nrecv %d Page_Bits %d\n", nrecv, (1UL << PAGE_BITS));
                 chunk_size=(1UL << PAGE_BITS);
             }
-            else if (strcmp(meta_data.data_position,"PAGE_2M_BITS")==0){
+            else if (strcmp(meta_data.data_position,"2")==0){
                 while(nrecv<(1UL << PAGE_2M_BITS))
                     total += nrecv += recv(new_conn_fd, (void*)(size_t*)(mem + (location & PAGE_2M_MASK))+nrecv, (1UL << PAGE_2M_BITS)-nrecv, 0);
                 //printf("nrecv %d Page_2M %d\n", nrecv, (1UL << PAGE_2M_BITS));
                 chunk_size=(1UL << PAGE_2M_BITS);
             }
-            else if (strcmp(meta_data.data_position,"PAGE_SIZE")==0){
+            else if (strcmp(meta_data.data_position,"P")==0){
                 while(nrecv<PAGE_SIZE)
                     total += nrecv += recv(new_conn_fd, (void*)(size_t*)(mem + location)+nrecv, PAGE_SIZE-nrecv, 0);
                 //printf("nrecv %d Page_Size %d\n", nrecv, (PAGE_SIZE));
@@ -681,7 +681,7 @@ int comm_chunk_server(uint8_t* mem)
                 perror("Memory chunk not correct recieved \n");
                 exit(EXIT_FAILURE);
             }
-        }else if((strcmp(meta_data.data_name,"mem")==0) && (strcmp(meta_data.data_position,"finished")==0)){
+        }else if((strcmp(meta_data.data_name,"m")==0) && (strcmp(meta_data.data_position,"f")==0)){
             //close(new_conn_chunk_fd); 
             break;
         } else {
@@ -743,7 +743,7 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *comm_type, char 
     }
 
 
-    if((strcmp(meta_data.data_name,"mem")==0) && (strcmp(meta_data.data_position,"finished")!=0)){
+    if((strcmp(meta_data.data_name,"m")==0) && (strcmp(meta_data.data_position,"f")!=0)){
         unsigned long chunk_size=0;  
         int nsent=0;
         int total=0;
@@ -751,19 +751,19 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *comm_type, char 
             total+= nsent += send(client_fd, (void*)((char*)pgdpgt)+nsent, sizeof(size_t)-nsent, 0);
         //printf("chunk_client nsent %d sizeof(size_t) %d\n", nsent, sizeof(size_t));
         nsent=0;
-        if (strcmp(meta_data.data_position,"PAGE_BITS")==0){
+        if (strcmp(meta_data.data_position,"B")==0){
             while(nsent<(1UL << PAGE_BITS))
                 total += nsent += send(client_fd, (void*)((size_t)mem_chunck)+nsent, (1UL << PAGE_BITS)-nsent, 0);
                 //printf("nsent %d Page_Bits %d\n", nsent, (1UL << PAGE_BITS));
                 chunk_size=(1UL << PAGE_BITS);
                 //gettimeofday(&chunk_end, NULL);
-            } else if (strcmp(meta_data.data_position,"PAGE_2M_BITS")==0){
+            } else if (strcmp(meta_data.data_position,"2")==0){
                 while(nsent<(1UL << PAGE_2M_BITS))
                     total += nsent += send(client_fd, (void*)((size_t)mem_chunck)+nsent, (1UL << PAGE_2M_BITS)-nsent, 0);
                 //printf("nsent %d Page_2M %d\n", nsent, (1UL << PAGE_2M_BITS));
                 chunk_size=(1UL << PAGE_2M_BITS);
                 //gettimeofday(&chunk_end, NULL);
-            } else if (strcmp(meta_data.data_position,"PAGE_SIZE")==0) {
+            } else if (strcmp(meta_data.data_position,"P")==0) {
                 while(nsent<PAGE_SIZE)
                     total += nsent += send(client_fd, (void*)((size_t)mem_chunck)+nsent, PAGE_SIZE-nsent, 0);
                 //printf("nsent %d Page_Size %d\n", nsent, PAGE_SIZE);
@@ -779,7 +779,7 @@ int comm_chunk_client(size_t *pgdpgt, size_t *mem_chunck, char *comm_type, char 
                 close(client_fd);
                 exit(EXIT_FAILURE);
             }
-    } else if ((strcmp(meta_data.data_name,"mem")==0) && (strcmp(meta_data.data_position,"finished")==0)) {
+    } else if ((strcmp(meta_data.data_name,"m")==0) && (strcmp(meta_data.data_position,"f")==0)) {
         //printf("All Memory chunks sent \n");
         memory_chunk=0;
         //printf("before disconnect in comm_chunk\n");

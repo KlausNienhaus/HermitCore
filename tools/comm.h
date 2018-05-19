@@ -75,9 +75,9 @@
 
 // struct for information size and data name
 typedef struct comm_socket_header{
-	uint	data_size;	/* Data Size  */
-	char	data_name[4];	/* File Name   */
-    char    data_position[12]; /* Data/File Path */
+	//uint	data_size;	/* Data Size  */
+	char	data_name[2];	/* File Name   */
+    char    data_position[2]; /* Data/File Path */
 } comm_socket_header_t;
 
 struct msr_data{

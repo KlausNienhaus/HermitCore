@@ -791,7 +791,7 @@ static int vcpu_loop(void)
 
 	if (restart) {
 		comm_client_connect(comm_old_host);
-		comm_chunk_client(NULL, NULL, "mem","finished");
+		comm_chunk_client(NULL, NULL, "m","f");
 		comm_client_disconnect();
 		if (cpuid == 0)
 			no_checkpoint++;
@@ -1612,7 +1612,7 @@ nextslot:
 					size_t addr = (i*sizeof(size_t)*8+j)*PAGE_SIZE;
 					if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
 						gettimeofday(&chunk_start, NULL);
-						comm_chunk_client(&addr, (size_t*) (guest_mem + addr), "mem", "PAGE_SIZE");
+						comm_chunk_client(&addr, (size_t*) (guest_mem + addr), "m", "P");
 						gettimeofday(&chunk_end, NULL);
 						chunk_trans_spent += (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
 						chunk_trans_spent += (chunk_end.tv_usec - chunk_begin.tv_usec);
@@ -1638,7 +1638,7 @@ nextslot:
 		goto nextslot;
 	}
 	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
-		comm_chunk_client(NULL, NULL, NULL, comm_new_host, "mem","finished");
+		comm_chunk_client(NULL, NULL, NULL, comm_new_host, "m","f");
 #else
 	size_t* pml4 = (size_t*) (guest_mem+elf_entry+PAGE_SIZE);
 	for(size_t i=0; i<(1 << PAGE_MAP_BITS); i++) {
@@ -1666,7 +1666,7 @@ nextslot:
 								//printf("timer_hander sending mem_chunk page_bits chunk_client next\n");
 							if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
 								gettimeofday(&chunk_begin, NULL);
-								comm_chunk_client(&pgt_entry, (size_t*)(guest_mem + (pgt[l] & PAGE_MASK)), "mem", "PAGE_BITS");
+								comm_chunk_client(&pgt_entry, (size_t*)(guest_mem + (pgt[l] & PAGE_MASK)), "m", "B");
 								gettimeofday(&chunk_end, NULL);
 								chunk_trans_spent += (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
 								chunk_trans_spent += (chunk_end.tv_usec - chunk_begin.tv_usec);
@@ -1688,7 +1688,7 @@ nextslot:
 						//printf("timer_hander sending mem_chunk page_2M chunk_client next\n");
 					if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
 						gettimeofday(&chunk_begin, NULL);
-						comm_chunk_client(pgd+k, (size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), "mem", "PAGE_2M_BITS");
+						comm_chunk_client(pgd+k, (size_t*) (guest_mem + (pgd[k] & PAGE_2M_MASK)), "m", "2");
 						gettimeofday(&chunk_end, NULL);
 						chunk_trans_spent += (chunk_end.tv_sec - chunk_begin.tv_sec) * 1000000;
 						chunk_trans_spent += (chunk_end.tv_usec - chunk_begin.tv_usec);
@@ -1706,7 +1706,7 @@ nextslot:
 	}
 	//printf("timer_hander sending mem_chunk finished chunk_client next\n");
 	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
-		comm_chunk_client(NULL, NULL, "mem", "finished");
+		comm_chunk_client(NULL, NULL, "m", "f");
 #endif
 	if 	(hermit_check>0)
 		fclose(f);
