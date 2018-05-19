@@ -76,8 +76,8 @@
 // struct for information size and data name
 typedef struct comm_socket_header{
 	uint	data_size;	/* Data Size  */
-	char	data_name[1024];	/* File Name   */
-    char    data_position[1024]; /* Data/File Path */
+	char	data_name[4];	/* File Name   */
+    char    data_position[12]; /* Data/File Path */
 } comm_socket_header_t;
 
 struct msr_data{
@@ -110,8 +110,8 @@ typedef struct comm_config{
 
 
 
-int commserver(void);
-int commclient(char *path, char *position, char *server_ip);
+//int commserver(void);
+//int commclient(char *path, char *position, char *server_ip);
 
 int comm_server_accept();
 int comm_server_close();

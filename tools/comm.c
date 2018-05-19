@@ -146,7 +146,7 @@ int comm_server_close()
 
 //@brief:   Server side C function for TCP Socket Connections 
 //          atm recieves data file from client (e.g. checkpoint)
-int commserver(void)
+/*int commserver(void)
 {
     //int server_fd, new_conn_fd; //data_size;
     struct sockaddr_in address;
@@ -364,7 +364,7 @@ int commclient(char *path, char *position, char *server_ip)
 
     close(client_fd);
     return 0;
-}
+}*/
 
 
 int comm_config_server(comm_config_t *checkpoint_config)
