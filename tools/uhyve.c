@@ -1237,15 +1237,6 @@ int uhyve_init(char *path)
 		//no_checkpoint=config_struct.no_checkpoint;
 		elf_entry=config_struct.elf_entry;
 		full_checkpoint=config_struct.full_checkpoint;
-		if (comm_vcpu_register==NULL)
-			//comm_vcpu_register = vcpu_register;
-			comm_vcpu_register = (comm_register_t*) calloc(ncores,sizeof(comm_register_t));
-		else if (sizeof(comm_vcpu_register)!=sizeof(comm_register_t)){
-			free(comm_vcpu_register);
-			//comm_vcpu_register = vcpu_register;
-			comm_vcpu_register = (comm_register_t*) calloc(ncores,sizeof(comm_register_t));
-		}
-		comm_register_server(comm_vcpu_register, &ncores);
 		//comm_server_close();
 	} else if ((strncmp(comm_mode, "server", 6)==0) && (hermit_check)){
 		if (f != NULL) {
@@ -1420,7 +1411,18 @@ int uhyve_init(char *path)
 			exit(EXIT_FAILURE);
 	}
 
+	
+
 	if 	((strncmp(comm_mode, "server", 6)==0) && (!(hermit_check>0)))
+		if (comm_vcpu_register==NULL)
+			//comm_vcpu_register = vcpu_register;
+			comm_vcpu_register = (comm_register_t*) calloc(ncores,sizeof(comm_register_t));
+		else if (sizeof(comm_vcpu_register)!=sizeof(comm_register_t)){
+			free(comm_vcpu_register);
+			//comm_vcpu_register = vcpu_register;
+			comm_vcpu_register = (comm_register_t*) calloc(ncores,sizeof(comm_register_t));
+		}
+		comm_register_server(comm_vcpu_register, &ncores);
 		comm_server_close();
 
 	pthread_barrier_init(&barrier, NULL, ncores);
@@ -1447,7 +1449,7 @@ static void timer_handler(int signum)
 	struct stat st = {0};
 	const size_t flag = (!full_checkpoint && (no_checkpoint > 0)) ? PG_DIRTY : PG_ACCESSED;
 	char fname[MAX_FNAME];
-	struct timeval begin, end, config_vcpu, vcpu_clock, clock_memory, memory_end, chunk_begin, chunk_end;
+	struct timeval begin, end, config_clock, vcpu_end, clock_memory, memory_vcpu, chunk_begin, chunk_end;
 	FILE* f = NULL;
 	size_t memorypart=0; //start_config, config_time_spent;
 	size_t chunk_trans_spent=0;
@@ -1476,18 +1478,9 @@ static void timer_handler(int signum)
 
 		comm_client_connect(comm_new_host);
 		comm_config_client(&checkpoint_config); //, comm_new_host, "config", "NULL");
-		gettimeofday(&config_vcpu, NULL);
+		gettimeofday(&config_clock, NULL);
 		
 	
-		if (comm_vcpu_register==NULL)
-			//comm_vcpu_register = vcpu_register;
-			comm_vcpu_register = (comm_register_t*) calloc(ncores,sizeof(comm_register_t));
-		else if (sizeof(comm_vcpu_register)!=sizeof(comm_register_t)*ncores)
-		{
-			free(comm_vcpu_register);
-			//comm_vcpu_register = vcpu_register;
-			comm_vcpu_register = (comm_register_t*) calloc(ncores,sizeof(comm_register_t));
-		}
 	}
 	
 
@@ -1513,30 +1506,9 @@ static void timer_handler(int signum)
 	
 
 	
-	for (size_t i = 0; i < ncores; i++)
-		if (vcpu_threads[i] != pthread_self())
-			pthread_kill(vcpu_threads[i], SIGRTMIN);
-
 	pthread_barrier_wait(&barrier);
 
-	save_cpu_state();
 
-
-
-	if (strncmp(comm_mode, "client", 6)==0 && signum==10)
-	{
-		//for(int i=0;i<ncores;i++)
-			//printf("In timer_handler sending vcpu_register[cpuid].regs %d, vcpu_register[cpuid].lapic %d, (comm_vcpu_register+i)->regs , (comm_vcpu_register+i)->lapic\n", comm_vcpu_register[i].regs, comm_vcpu_register[i].lapic, (comm_vcpu_register+i)->regs, (comm_vcpu_register+i)->lapic);
-		
-		comm_register_client(comm_vcpu_register, &ncores); //, comm_new_host, "register", "NULL");
-		//comm_client_disconnect();
-		//usleep(2000);
-
-		
-	}
-
-	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10)
-		gettimeofday(&vcpu_clock, NULL);
 
 
 	if (hermit_check>0){	//((hermit_check>0)&&!(strncmp(comm_mode, "client", 6)==0))
@@ -1712,12 +1684,44 @@ nextslot:
 		fclose(f);
 
 	if 	(strncmp(comm_mode, "client", 6)==0 && signum==10){
-		gettimeofday(&memory_end, NULL);
-		comm_client_disconnect();
+		gettimeofday(&memory_vcpu, NULL);
+		//comm_client_disconnect();
+		if (comm_vcpu_register==NULL)
+			//comm_vcpu_register = vcpu_register;
+			comm_vcpu_register = (comm_register_t*) calloc(ncores,sizeof(comm_register_t));
+		else if (sizeof(comm_vcpu_register)!=sizeof(comm_register_t)*ncores)
+		{
+			free(comm_vcpu_register);
+			//comm_vcpu_register = vcpu_register;
+			comm_vcpu_register = (comm_register_t*) calloc(ncores,sizeof(comm_register_t));
+		}
+
 	}
 
 
 	pthread_barrier_wait(&barrier);
+
+	for (size_t i = 0; i < ncores; i++)
+		if (vcpu_threads[i] != pthread_self())
+			pthread_kill(vcpu_threads[i], SIGRTMIN);
+
+	pthread_barrier_wait(&barrier);
+
+	save_cpu_state();
+		
+
+	if (strncmp(comm_mode, "client", 6)==0 && signum==10)
+	{
+		//for(int i=0;i<ncores;i++)
+			//printf("In timer_handler sending vcpu_register[cpuid].regs %d, vcpu_register[cpuid].lapic %d, (comm_vcpu_register+i)->regs , (comm_vcpu_register+i)->lapic\n", comm_vcpu_register[i].regs, comm_vcpu_register[i].lapic, (comm_vcpu_register+i)->regs, (comm_vcpu_register+i)->lapic);
+		
+		comm_register_client(comm_vcpu_register, &ncores); //, comm_new_host, "register", "NULL");
+		gettimeofday(&vcpu_end, NULL);
+		//comm_client_disconnect();
+		//usleep(2000);
+		comm_client_disconnect();
+		
+	}
 
 	if (verbose) {
 		gettimeofday(&end, NULL);
@@ -1738,22 +1742,22 @@ nextslot:
 		size_t mig_time_spent = (end.tv_sec - begin.tv_sec) * 1000000;
 		mig_time_spent += (end.tv_usec - begin.tv_usec);
 		
-		size_t config_time_spent = (config_vcpu.tv_sec - begin.tv_sec) * 1000000;
-		config_time_spent += (config_vcpu.tv_usec - begin.tv_usec);
+		size_t config_time_spent = (config_clock.tv_sec - begin.tv_sec) * 1000000;
+		config_time_spent += (config_clock.tv_usec - begin.tv_usec);
 
-		size_t vcpu_time_spent = (vcpu_clock.tv_sec - config_vcpu.tv_sec) * 1000000;
-		vcpu_time_spent += (vcpu_clock.tv_usec - config_vcpu.tv_usec);
+		size_t clock_time_spent = (clock_memory.tv_sec - config_clock.tv_sec) * 1000000;
+		clock_time_spent += (clock_memory.tv_usec - config_clock.tv_usec);
 
-		size_t clock_time_spent = (clock_memory.tv_sec - vcpu_clock.tv_sec) * 1000000;
-		clock_time_spent += (clock_memory.tv_usec - vcpu_clock.tv_usec);
-
-		size_t memory_time_spent = (memory_end.tv_sec - clock_memory.tv_sec) * 1000000;
-		memory_time_spent += (memory_end.tv_usec - clock_memory.tv_usec);
+		size_t memory_time_spent = (memory_vcpu.tv_sec - clock_memory.tv_sec) * 1000000;
+		memory_time_spent += (memory_vcpu.tv_usec - clock_memory.tv_usec);
 
 		size_t mig_page_spent = memory_time_spent - chunk_trans_spent;
 
-		size_t restore_time_spent = (end.tv_sec - memory_end.tv_sec) * 1000000;
-		restore_time_spent += (end.tv_usec - memory_end.tv_usec);
+		size_t vcpu_time_spent = (vcpu_end.tv_sec - memory_vcpu.tv_sec) * 1000000;
+		vcpu_time_spent += (vcpu_end.tv_usec - memory_vcpu.tv_usec);
+
+		size_t restore_time_spent = (end.tv_sec - vcpu_end.tv_sec) * 1000000;
+		restore_time_spent += (end.tv_usec - vcpu_end.tv_usec);
 
 		if (stat("coldmigration", &st) == -1)
 			mkdir("coldmigration", 0700);

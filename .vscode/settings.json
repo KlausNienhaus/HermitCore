@@ -24,6 +24,7 @@
         "*.inc": "c",
         "utility": "c",
         "fstream": "c",
-        "tuple": "c"
+        "tuple": "c",
+        "*.tcc": "c"
     }
 }
